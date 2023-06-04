@@ -10,9 +10,9 @@ class TinnitusApp:
         master.title("Tinnitus Relief App")
 
         self.fs = 192000  # Sample rate
-        self.amplitude = tk.DoubleVar(value=0.0)  # Initial amplitude, starts off
-        self.frequency = tk.DoubleVar(value=14000)  # Initial frequency
-        self.noise_amplitude = tk.DoubleVar(value=0.0)  # Initial noise amplitude
+        self.amplitude = tk.DoubleVar(value=0.0)
+        self.frequency = tk.DoubleVar(value=14000)
+        self.noise_amplitude = tk.DoubleVar(value=0.0)
 
         self.freq_scale = tk.Scale(master, from_=1000, to=20000,
                                    length=600, resolution=10,
@@ -51,8 +51,8 @@ class TinnitusApp:
         duration = 5.0
         t = np.arange(self.fs * duration) / self.fs
         tone = amplitude * np.sin(2 * np.pi * frequency * t)
-        tone = self.bandpass_filter(tone, frequency)  # Apply the bandpass filter only to the tone
-        tone += self.noise_amplitude.get() * np.random.normal(0, 1, len(t))  # Add white noise afterwards
+        tone = self.bandpass_filter(tone, frequency)
+        tone += self.noise_amplitude.get() * np.random.normal(0, 1, len(t))
         return tone.reshape(-1, 1)
 
     def bandpass_filter(self, data, center_freq):

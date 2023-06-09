@@ -1,3 +1,6 @@
+# Created with the assistance of GPT-4 on 6/8/2023
+# This name combines the functionality of the program (Seismo- from seismometer, measuring vibrations) with the hardware it's designed for (the Raspberry Pi).
+
 import pygame
 from pygame.locals import *
 from OpenGL.GL import *
@@ -18,7 +21,73 @@ except Exception as e:
 # Initialize a deque to store acceleration values
 acceleration_values = collections.deque(maxlen=100)
 
-# Other functions remain the same...
+# Function to draw a bar in 3D using the OpenGL library
+def draw_bar(height, color):
+    glColor3f(*color)
+    glBegin(GL_QUADS)
+
+    # The vertices for each face of the bar are defined here, with each face being a quadrilateral
+    # Front face
+    glVertex3f(0, 0, 0)
+    glVertex3f(1, 0, 0)
+    glVertex3f(1, height, 0)
+    glVertex3f(0, height, 0)
+
+    # Back face
+    glVertex3f(0, 0, -1)
+    glVertex3f(1, 0, -1)
+    glVertex3f(1, height, -1)
+    glVertex3f(0, height, -1)
+
+    # Left face
+    glVertex3f(0, 0, 0)
+    glVertex3f(0, 0, -1)
+    glVertex3f(0, height, -1)
+    glVertex3f(0, height, 0)
+
+    # Right face
+    glVertex3f(1, 0, 0)
+    glVertex3f(1, 0, -1)
+    glVertex3f(1, height, -1)
+    glVertex3f(1, height, 0)
+
+    glEnd()
+
+# Function to draw text on the screen, utilizing Pygame for font rendering and OpenGL to display
+def draw_text(text, x, y, font, color):
+    text_surface = font.render(text, True, color)
+    text_data = pygame.image.tostring(text_surface, "RGBA", True)
+    width, height = text_surface.get_size()
+
+    glEnable(GL_TEXTURE_2D)
+    texid = glGenTextures(1)
+    glBindTexture(GL_TEXTURE_2D, texid)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, text_data)
+
+    glEnable(GL_BLEND)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+    glBindTexture(GL_TEXTURE_2D, texid)
+    glBegin(GL_QUADS)
+    glTexCoord(0, 0); glVertex(x, y)
+    glTexCoord(1, 0); glVertex(x + width, y)
+    glTexCoord(1, 1); glVertex(x + width, y + height)
+    glTexCoord(0, 1); glVertex(x, y + height)
+    glEnd()
+
+    glDisable(GL_BLEND)
+    glDisable(GL_TEXTURE_2D)
+    glDeleteTextures(1, [texid])
+
+# Function to draw a line graph using OpenGL
+def draw_line_graph(values, color):
+    glColor3f(*color)
+    glBegin(GL_LINE_STRIP)
+    for i, value in enumerate(values):
+        glVertex3f(i / len(values), value, 0)
+    glEnd()
 
 # The main function where the Pygame and OpenGL setup happens, as well as the main game loop
 def main():

@@ -2,76 +2,92 @@
 This program is a highly-enhanced, object-oriented calculator that can perform a range of arithmetic operations.
 The calculator was improved with the assistance of GPT-4 and Bard on 2023-06-08.
 """
-
-# Import the necessary modules
+import tkinter as tk
 import math
-
+import re
+import keyword
 class Calculator:
     """A calculator class that can perform a range of arithmetic operations."""
-    
     def __init__(self):
         self.history = []
-
-    def calculate(self, operation, operand1, operand2=0):
-        # Perform the appropriate calculation based on operation
-        operations = {
-            "+": operand1 + operand2,
-            "-": operand1 - operand2,
-            "*": operand1 * operand2,
-            "/": operand1 / operand2 if operand2 != 0 else 'Error: Division by zero',
-            "^": operand1 ** operand2,
-            "sqrt": math.sqrt(operand1) if operand1 >= 0 else 'Error: Square root of negative number',
-            "log": math.log(operand1) if operand1 > 0 else 'Error: Logarithm of non-positive number',
-            "sin": math.sin(operand1),
-            "cos": math.cos(operand1),
-            "tan": math.tan(operand1)
+        self.constants = {
+            'pi': math.pi,
+            'e': math.e,
+            'g': 9.81,  # acceleration due to gravity
+            'c': 299792458,  # speed of light in m/s
+            'h': 6.62607015e-34  # Planck's constant in m^2 kg / s
         }
-        result = operations.get(operation, "Invalid operation. Please enter a valid operation.")
-        if isinstance(result, float):
-            # Add calculation to history
-            self.history.append((operation, operand1, operand2, result))
-        return result
-
-    def show_history(self):
-        # Show the history of all calculations
-        for i, item in enumerate(self.history):
-            operation, operand1, operand2, result = item
-            print(f"{i+1}: {operand1} {operation} {operand2} = {result}")
-
-def main():
-    """Main function to run the calculator in a loop."""
-    print("Welcome to the enhanced calculator!")
-    print("Type 'help' for a list of available operations, 'history' to see all past calculations, or 'exit' to quit.")
-
-    calc = Calculator()
-
-    while True:
-        user_input = input("\nEnter your operation: ")
-
-        if user_input.lower() == 'exit':
-            break
-        elif user_input.lower() == 'history':
-            calc.show_history()
-            continue
-        elif user_input.lower() == 'help':
-            print("Available operations: +, -, *, /, ^ (power), sqrt (square root), log (natural logarithm), sin, cos, tan")
-            continue
-
-        try:
-            operation, operand1, operand2 = user_input.split()
-            operand1 = float(operand1)
-            operand2 = float(operand2)
-        except ValueError:
-            print("Invalid input. Please enter operation and two numbers separated by spaces (for example, '+ 1 2'). For single operand operations like sqrt, log, sin, cos, tan, the second number can be 0.")
-            continue
-
-        result = calc.calculate(operation, operand1, operand2)
-
-        if "Error" not in str(result) and "Invalid" not in str(result):
-            print("The result is:", result)
+class CalculatorGUI:
+    def __init__(self, calculator):
+        self.calculator = calculator
+        self.window = tk.Tk()
+        self.window.title('Calculator')
+        self.entry = tk.Entry(self.window, width=35, font=('Arial', 14))
+        self.entry.grid(row=0, column=0, columnspan=5, padx=10, pady=10)
+        buttons = [
+            ['7', '8', '9', '/', 'sqrt', '(', ')'],
+            ['4', '5', '6', '*', 'log', 'pi', 'e'],
+            ['1', '2', '3', '-', 'sin', '^', 'c'],
+            ['0', '.', '=', '+', 'cos', 'h', 'g'],
+            ['Clear', '', '', '', '', '', '']
+        ]
+        for i, row in enumerate(buttons):
+            for j, button in enumerate(row):
+                if button != '':
+                    if button in self.calculator.constants:
+                        btn = tk.Button(self.window, text=button, width=5, height=2, font=('Arial', 12), command=lambda x=button: self.handle_button_click(str(self.calculator.constants[x])))
+                    else:
+                        btn = tk.Button(self.window, text=button, width=5, height=2, font=('Arial', 12), command=lambda x=button: self.handle_button_click(x))
+                    btn.grid(row=i+1, column=j, padx=5, pady=5)
+    def handle_button_click(self, button):
+        if button == '=':
+            self.equals()
+        elif button == 'Clear':
+            self.clear()
         else:
-            print(result)
-
-# Run the main function
+            current_expression = self.entry.get()
+            self.entry.delete(0, 'end')
+            self.entry.insert('end', current_expression + button)
+    def equals(self):
+        expression = self.entry.get()
+        if self.validate_expression(expression):
+            try:
+                result = str(eval(expression))
+                self.entry.delete(0, 'end')
+                self.entry.insert('end', result)
+            except ZeroDivisionError:
+                self.entry.delete(0, 'end')
+                self.entry.insert('end', 'Error: Division by zero')
+            except SyntaxError:
+                self.entry.delete(0, 'end')
+                self.entry.insert('end', 'Error: Syntax error')
+            except ValueError:
+                self.entry.delete(0, 'end')
+                self.entry.insert('end', 'Error: Invalid value')
+            except TypeError:
+                self.entry.delete(0, 'end')
+                self.entry.insert('end', 'Error: Invalid operation')
+            except Exception as e:
+                self.entry.delete(0, 'end')
+                self.entry.insert('end', 'Error: ' + str(e))
+        else:
+            self.entry.delete(0, 'end')
+            self.entry.insert('end', 'Invalid input')
+    def clear(self):
+        self.entry.delete(0, 'end')
+    def validate_expression(self, expression):
+        if any(kw in expression for kw in keyword.kwlist):
+            return False
+        if expression.count('(') != expression.count(')'):
+            return False
+        if not re.match("^[-+*/.\d\s()^sqrtlogsinetcospie]+$", expression):
+            return False
+        return True
+    def run(self):
+        self.window.mainloop()
+def main():
+    calc = Calculator()
+    gui = CalculatorGUI(calc)
+    gui.run()
 if __name__ == "__main__":
     main()

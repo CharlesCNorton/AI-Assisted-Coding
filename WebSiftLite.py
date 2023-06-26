@@ -28,34 +28,44 @@ class MyHTMLParser(HTMLParser):
         self.current_tag = None
 
     def handle_data(self, data):
-        if self.current_tag is not None:
+        if self.current_tag is not None and self.current_tag not in ['script', 'style']:
             if self.current_header is not None:
                 self.current_header["data"] += data.strip()
             self.text.append({"tag": self.current_tag, "data": data.strip()})
 
-def get_website_content(site):
+    def error(self, message):
+        print("\033[0;31;40mHTML Parser Error:\033[0m", message)
+
+def get_website_content(site, max_retries=3):
     parsed_url = urlparse(site)
     if parsed_url.scheme not in ['http', 'https']:
         print("Invalid URL, please enter a URL starting with http or https.")
         return None
 
-    try:
-        if parsed_url.scheme == 'https':
-            conn = http.client.HTTPSConnection(parsed_url.netloc, context=ssl._create_unverified_context())
-        else:
-            conn = http.client.HTTPConnection(parsed_url.netloc)
+    headers = {"User-Agent": "Mozilla/5.0"}
 
-        conn.request("GET", parsed_url.path)
-        response = conn.getresponse()
+    for i in range(max_retries):
+        try:
+            if parsed_url.scheme == 'https':
+                conn = http.client.HTTPSConnection(parsed_url.netloc, context=ssl._create_unverified_context())
+            else:
+                conn = http.client.HTTPConnection(parsed_url.netloc)
 
-        if response.status == 200:
-            return response.read().decode()
-        else:
-            print("Failed to fetch the webpage, status:", response.status)
-            return None
-    except Exception as e:
-        print(f"An error occurred: {str(e)}")
-        return None
+            conn.request("GET", parsed_url.path, headers=headers)
+            response = conn.getresponse()
+
+            if response.status in [200, 301, 302]:
+                return response.read().decode()
+            else:
+                print("Failed to fetch the webpage, status:", response.status)
+                return None
+        except Exception as e:
+            print(f"Attempt {i+1} of {max_retries} failed: {str(e)}")
+        finally:
+            conn.close()
+
+    print(f"Failed to fetch the webpage after {max_retries} attempts.")
+    return None
 
 def main():
     while True:
@@ -67,17 +77,28 @@ def main():
             content = get_website_content(site)
             if content:
                 parser = MyHTMLParser()
-                parser.feed(content)
-                print("Headers on the page:")
+                try:
+                    parser.feed(content)
+                except Exception as e:
+                    print("\033[0;31;40mError parsing the content:\033[0m", e)
+                    continue
+
+                print("\033[1;32;40mHeaders on the page:\033[0m")
                 for header in parser.headers:
-                    print(f"{header['tag']}: {header['data']}")
-                print("Links on the page:")
+                    print(f"\033[1;31;40m{header['tag']}:\033[0m {header['data']}")
+
+                print("\n\033[1;32;40mLinks on the page:\033[0m")
                 for link in parser.links:
                     print(link)
-                print("Text on the page:")
+
+                print("\n\033[1;32;40mText on the page:\033[0m")
+                last_tag = None
                 for text in parser.text:
-                    if text['data']: # Only print if there is some data
-                        print(f"{text['tag']}: {text['data']}")
+                    if text['data']:  # Only print if there is some data
+                        if text['tag'] != last_tag:
+                            print(f"\n\033[1;34;40m{text['tag']}:\033[0m")
+                            last_tag = text['tag']
+                        print(text['data'])
         elif choice == "2":
             break
         else:

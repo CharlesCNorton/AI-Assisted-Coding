@@ -16,13 +16,13 @@ def fetch_from_entrez(term=None, db="", id=None, retmode=None):
             handle = Entrez.efetch(id=id, db=db, retmode=retmode)
         return Entrez.read(handle)
     except RuntimeError as e:
-        console.print(f"[red]Error: {e}. Please check your connection or try again later.[/red]")
+        console.print(f"[red]Error: {e}. Please check your internet connection or ensure you've not exceeded the API limit.[/red]")
         return None
 
 def get_lineage(genus_species):
     search_record = fetch_from_entrez(term=genus_species, db="taxonomy")
     if search_record is None or not search_record['IdList']:
-        console.print("[red]Species not found or an error occurred. Please check your spelling or try a different species.[/red]")
+        console.print("[red]Species not found or an error occurred. Please verify the spelling or try a different species.[/red]")
         return None
 
     taxonomy_id = search_record['IdList'][0]
@@ -54,6 +54,8 @@ def fetch_species_of_genus(genus):
     species = []
     for tax_id in id_list:
         records = fetch_from_entrez(id=tax_id, db="taxonomy", retmode="xml")
+        if records is None:
+            continue
         for record in records:
             species.append(record["ScientificName"])
 
@@ -67,16 +69,16 @@ def format_additional_info(info):
     creation_date = info["CreateDate"]
     update_date = info["UpdateDate"]
 
-    console.print(f"Common Names: {common_names}")
-    console.print(f"Synonyms: {synonyms}")
-    console.print(f"Genetic Code: {genetic_code}")
-    console.print(f"Mitochondrial Genetic Code: {mito_genetic_code}")
-    console.print(f"Creation Date: {creation_date}")
-    console.print(f"Update Date: {update_date}")
+    console.print(f"[yellow]Common Names:[/yellow] {common_names}")
+    console.print(f"[yellow]Synonyms:[/yellow] {synonyms}")
+    console.print(f"[yellow]Genetic Code:[/yellow] {genetic_code}")
+    console.print(f"[yellow]Mitochondrial Genetic Code:[/yellow] {mito_genetic_code}")
+    console.print(f"[yellow]Creation Date:[/yellow] {creation_date}")
+    console.print(f"[yellow]Update Date:[/yellow] {update_date}")
 
 def lineage_to_tree(lineage):
     rank_names = ['superkingdom', 'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']
-    tree = Tree(":dna: Life")
+    tree = Tree(":dna: Life", style="bold blue")
     current_level = tree
     for rank in rank_names:
         if rank in lineage:
@@ -102,9 +104,9 @@ def main():
             if species:
                 console.print(f"All known species in the {genus} genus:")
                 for sp in species:
-                    console.print(f"- {sp}")
+                    console.print(f"- [green]{sp}[/green]")
             else:
-                console.print(f"No known species found for the {genus} genus.")
+                console.print(f"[red]No known species found for the {genus} genus.[/red]")
         elif choice == "3":
             console.print("[blue]Goodbye![/blue]")
             break

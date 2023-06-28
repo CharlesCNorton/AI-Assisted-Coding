@@ -1,21 +1,24 @@
 import os
 import tkinter as tk
 from tkinter import filedialog, messagebox
-from PIL import Image, UnidentifiedImageError
+from tkinter import ttk
+from PIL import Image, UnidentifiedImageError, ExifTags
+import threading
 
 SUPPORTED_FORMATS = ["BMP", "DIB", "EPS", "GIF", "ICNS", "ICO", "IM", "JPEG", "JPG", "MSP", "PCX", "PNG", "PPM", "SGI", "SPIDER", "TGA", "TIFF", "WebP", "XBM"]
 
-def resize_image(input_image_path, output_image_path, size, output_format):
+def resize_image(input_image_path, output_image_path, size, output_format, progress_bar):
     try:
         original_image = Image.open(input_image_path)
-    except UnidentifiedImageError:
-        raise Exception("The selected input file is not a valid image.")
-    except FileNotFoundError:
-        raise Exception("The selected input file does not exist.")
-    except PermissionError:
-        raise Exception("Permission denied when trying to open the input file.")
     except Exception as e:
-        raise Exception("An unknown error occurred while opening the input image. Error: " + str(e))
+        messagebox.showerror("Error", str(e))
+        return
+
+    if not original_image.format in SUPPORTED_FORMATS:
+        messagebox.showerror("Error", f"Invalid file format. Supported formats are: {', '.join(SUPPORTED_FORMATS)}")
+        return
+
+    exif = original_image.info['exif'] if 'exif' in original_image.info else None
 
     width, height = original_image.size
 
@@ -29,25 +32,26 @@ def resize_image(input_image_path, output_image_path, size, output_format):
     resized_image = original_image.resize((new_width, new_height), Image.LANCZOS)
 
     try:
-        resized_image.save(output_image_path, output_format)
-    except FileNotFoundError:
-        raise Exception("The output directory does not exist.")
-    except PermissionError:
-        raise Exception("Permission denied when trying to save the output file.")
-    except ValueError:
-        raise Exception(f"The output format {output_format} is not supported. Please use a supported format.")
+        if exif:
+            resized_image.save(output_image_path, output_format, exif=exif)
+        else:
+            resized_image.save(output_image_path, output_format)
     except Exception as e:
-        raise Exception("An unknown error occurred while saving the resized image. Error: " + str(e))
+        messagebox.showerror("Error", str(e))
+        return
+
+    progress_bar.stop()
+    messagebox.showinfo("Success", "Image was successfully resized.")
 
 def validate_size(size):
     if size <= 0:
-        raise Exception("Size must be a positive integer.")
+        messagebox.showerror("Error", "Size must be a positive integer.")
 
 def validate_format(input_path, format):
     if format == "":
         return os.path.splitext(input_path)[1].replace(".", "").upper()
     elif format.upper() not in SUPPORTED_FORMATS:
-        raise Exception(f"Format must be one of the following: {', '.join(SUPPORTED_FORMATS)}")
+        messagebox.showerror("Error", f"Format must be one of the following: {', '.join(SUPPORTED_FORMATS)}")
     else:
         return format
 
@@ -71,25 +75,24 @@ def start_program():
         path_variable.set(filedialog.askdirectory())
 
     def resize():
-        try:
-            if not input_path.get():
-                raise Exception("Please select an input image.")
-            if not output_path.get():
-                raise Exception("Please select an output directory.")
-            if not size.get().isdigit():
-                raise Exception("Please enter a positive integer for the size.")
-            size_value = int(size.get())
-            validate_size(size_value)
-            output_format_value = validate_format(input_path.get(), output_format.get())
-            output_image_path = os.path.join(output_path.get(), "resized." + output_format_value)
-            if os.path.isfile(output_image_path):
-                if not messagebox.askyesno("Overwrite Confirmation", "The output file already exists. Do you want to overwrite it?"):
-                    return
-            resize_image(input_path.get(), output_image_path, size_value, output_format_value)
-            messagebox.showinfo("Success", "Image was successfully resized.")
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
-
+        if not input_path.get():
+            messagebox.showerror("Error", "Please select an input image.")
+            return
+        if not output_path.get():
+            messagebox.showerror("Error", "Please select an output directory.")
+            return
+        if not size.get().isdigit():
+            messagebox.showerror("Error", "Please enter a positive integer for the size.")
+            return
+        size_value = int(size.get())
+        validate_size(size_value)
+        output_format_value = validate_format(input_path.get(), output_format.get())
+        output_image_path = os.path.join(output_path.get(), "resized." + output_format_value)
+        if os.path.isfile(output_image_path):
+            if not messagebox.askyesno("Overwrite Confirmation", "The output file already exists. Do you want to overwrite it?"):
+                return
+        progress_bar.start()
+        threading.Thread(target=resize_image, args=(input_path.get(), output_image_path, size_value, output_format_value, progress_bar)).start()
 
     tk.Label(window, text="Select Input Image:", bg='white', font=large_font).grid(row=0, column=0, sticky='W', padx=10, pady=10)
     tk.Entry(window, textvariable=input_path, font=small_font).grid(row=0, column=1, padx=10)
@@ -107,10 +110,13 @@ def start_program():
 
     tk.Button(window, text="Resize", command=resize, font=small_font).grid(row=4, column=0, columnspan=3, pady=10)
 
+    progress_bar = ttk.Progressbar(window, mode='indeterminate')
+    progress_bar.grid(row=5, column=0, columnspan=3, sticky='EW')
+
     def display_help():
         messagebox.showinfo("Help", "1. Click 'Browse' next to 'Select Input Image' and choose an image file.\n2. Click 'Browse' next to 'Select Output Directory' and choose a directory.\n3. Enter the desired size for the smaller side of the image (in pixels).\n4. Enter the desired output format (JPEG, PNG, etc.).\n5. Click 'Resize'.")
 
-    tk.Button(window, text="Help", command=display_help, font=small_font).grid(row=5, column=0, columnspan=3, pady=10)
+    tk.Button(window, text="Help", command=display_help, font=small_font).grid(row=6, column=0, columnspan=3, pady=10)
 
     window.mainloop()
 

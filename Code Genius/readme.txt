@@ -6,11 +6,6 @@ Python 3.x
 OpenAI API key
 OpenAI organization name
 
-Installation
-Clone the repository: git clone https://github.com/your_username/CodeGenius.git
-Change to the project directory: cd CodeGenius
-Install the required dependencies: pip install -r requirements.txt
-
 Usage
 Set your OpenAI API key and organization name in the openai.api_key and openai.organization variables in the code.
 Run the program: python CodeGenius.py

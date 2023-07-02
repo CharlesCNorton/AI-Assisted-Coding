@@ -2,34 +2,23 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import random
 from collections import deque
-import time
 
 def generate_maze(n_rows, n_cols, ix, iy):
-    maze = [[0] * n_cols for x in range(n_rows)]
+    maze = [[0] * n_cols for _ in range(n_rows)]
+    directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
     stack = deque([(ix, iy)])
-    while len(stack) > 0:
+    while stack:
         x, y = stack[-1]
         maze[y][x] = 1
-        nlst = []
-        if x > 1 and maze[y][x - 2] == 0:
-            nlst.append((x - 2, y))
-        if x < n_rows - 3 and maze[y][x + 2] == 0:
-            nlst.append((x + 2, y))
-        if y > 1 and maze[y - 2][x] == 0:
-            nlst.append((x, y - 2))
-        if y < n_cols - 3 and maze[y + 2][x] == 0:
-            nlst.append((x, y + 2))
-        if len(nlst) > 0:
-            dx, dy = random.choice(nlst)
-            if dx > x:
-                maze[y][x + 1] = 1
-            if dx < x:
-                maze[y][x - 1] = 1
-            if dy > y:
-                maze[y + 1][x] = 1
-            if dy < y:
-                maze[y - 1][x] = 1
-            stack.append((dx, dy))
+        possible_directions = [direction for direction in directions
+                               if 0 <= x + direction[0]*2 < n_rows
+                               and 0 <= y + direction[1]*2 < n_cols
+                               and maze[y + direction[1]*2][x + direction[0]*2] == 0]
+        if possible_directions:
+            dx, dy = random.choice(possible_directions)
+            maze[y + dy][x + dx] = 1
+            maze[y + dy*2][x + dx*2] = 1
+            stack.append((x + dx*2, y + dy*2))
         else:
             stack.pop()
     return maze
@@ -67,7 +56,8 @@ def print_header():
 
 def print_options():
     print("1. Generate a new maze")
-    print("4. Exit")
+    print("2. Save maze to file")
+    print("3. Exit")
 
 def select_difficulty():
     size_dict = {"easy": 11, "medium": 21, "hard": 31, "extreme": 41, "insane": 51}
@@ -114,21 +104,15 @@ def main():
                 plot_maze(maze, path)
         elif user_input == "2":
             if path is not None:
-                print(f"\nThe shortest path from {start} to {end} is:")
-                for point in path:
-                    print(point)
-            else:
-                print("\nYou need to generate a maze first.")
-        elif user_input == "3":
-            if path is not None:
                 plot_maze(maze, path, save=True)
                 print("\nMaze image has been saved as maze.png")
             else:
                 print("\nYou need to generate a maze first.")
-        elif user_input == "4":
+        elif user_input == "3":
             print("\nExiting...")
             break
         else:
             print("\nInvalid option. Please try again.")
+
 if __name__ == "__main__":
     main()

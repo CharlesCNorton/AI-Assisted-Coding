@@ -2,6 +2,7 @@ import http.client
 import ssl
 from html.parser import HTMLParser
 from urllib.parse import urlparse
+import urllib
 
 class MyHTMLParser(HTMLParser):
     def __init__(self):
@@ -36,13 +37,20 @@ class MyHTMLParser(HTMLParser):
     def error(self, message):
         print("\033[0;31;40mHTML Parser Error:\033[0m", message)
 
+def is_valid_url(url):
+    try:
+        result = urlparse(url)
+        return all([result.scheme, result.netloc])
+    except ValueError:
+        return False
+
 def get_website_content(site, max_retries=3):
-    parsed_url = urlparse(site)
-    if parsed_url.scheme not in ['http', 'https']:
+    if not is_valid_url(site):
         print("Invalid URL, please enter a URL starting with http or https.")
         return None
 
     headers = {"User-Agent": "Mozilla/5.0"}
+    parsed_url = urlparse(site)
 
     for i in range(max_retries):
         try:
@@ -59,7 +67,7 @@ def get_website_content(site, max_retries=3):
             else:
                 print("Failed to fetch the webpage, status:", response.status)
                 return None
-        except Exception as e:
+        except (http.client.HTTPException, urllib.error.URLError) as e:
             print(f"Attempt {i+1} of {max_retries} failed: {str(e)}")
         finally:
             conn.close()
@@ -71,7 +79,12 @@ def main():
     while True:
         print("1. Scrape a website")
         print("2. Exit")
-        choice = input("Enter your choice: ")
+        while True:
+            choice = input("Enter your choice: ")
+            if choice in ["1", "2"]:
+                break
+            print("Invalid choice, please try again.")
+
         if choice == "1":
             site = input("Enter a website to scrape (e.g. https://www.example.com): ")
             content = get_website_content(site)
@@ -101,8 +114,6 @@ def main():
                         print(text['data'])
         elif choice == "2":
             break
-        else:
-            print("Invalid choice, please try again.")
 
 if __name__ == "__main__":
     main()

@@ -2,111 +2,83 @@ import pygame
 from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
-from sense_hat import SenseHat
+from sense_hat import SenseHat, SenseHatError
 import numpy as np
 import sys
 
-# Initialize the SenseHat module
-sense = SenseHat()
+class MyPygameApp:
 
-# Function to draw a bar in 3D using the OpenGL library
-def draw_bar(height, color):
-    glColor3f(*color)
-    glBegin(GL_QUADS)
+    def __init__(self):
+        # Initialize the SenseHat module
+        try:
+            self.sense = SenseHat()
+        except SenseHatError as err:
+            sys.exit(f"Failed to initialize SenseHat: {err}")
 
-    # The vertices for each face of the bar are defined here, with each face being a quadrilateral
-    # Front face
-    glVertex3f(0, 0, 0)
-    glVertex3f(1, 0, 0)
-    glVertex3f(1, height, 0)
-    glVertex3f(0, height, 0)
+        # Initialize Pygame
+        pygame.init()
 
-    # Back face
-    glVertex3f(0, 0, -1)
-    glVertex3f(1, 0, -1)
-    glVertex3f(1, height, -1)
-    glVertex3f(0, height, -1)
+        # Define Colors
+        self.text_color = (255, 255, 255)
+        self.bar_color = (0, 1, 1)
 
-    # Left face
-    glVertex3f(0, 0, 0)
-    glVertex3f(0, 0, -1)
-    glVertex3f(0, height, -1)
-    glVertex3f(0, height, 0)
+        # Define the display
+        self.display = (800, 600)
 
-    # Right face
-    glVertex3f(1, 0, 0)
-    glVertex3f(1, 0, -1)
-    glVertex3f(1, height, -1)
-    glVertex3f(1, height, 0)
+        # Create screen
+        try:
+            self.screen = pygame.display.set_mode(self.display, DOUBLEBUF | OPENGL)
+        except pygame.error as err:
+            sys.exit(f"Failed to create display: {err}")
 
-    glEnd()
+        # Define font
+        self.font = pygame.font.Font(None, 36)
 
-# Function to draw text on the screen, utilizing Pygame for font rendering and OpenGL to display
-def draw_text(text, x, y, font, color):
-    text_surface = font.render(text, True, color)
-    text_data = pygame.image.tostring(text_surface, "RGBA", True)
-    width, height = text_surface.get_size()
+        # Set up OpenGL
+        self.setup_opengl()
 
-    glEnable(GL_TEXTURE_2D)
-    texid = glGenTextures(1)
-    glBindTexture(GL_TEXTURE_2D, texid)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, text_data)
+    def setup_opengl(self):
+        # Set up the perspective for OpenGL
+        gluPerspective(45, (self.display[0] / self.display[1]), 0.1, 50.0)
 
-    glEnable(GL_BLEND)
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        # Shifting the perspective
+        glTranslatef(-0.5, -1.0, -5)
 
-    glBindTexture(GL_TEXTURE_2D, texid)
-    glBegin(GL_QUADS)
-    glTexCoord(0, 0); glVertex(x, y)
-    glTexCoord(1, 0); glVertex(x + width, y)
-    glTexCoord(1, 1); glVertex(x + width, y + height)
-    glTexCoord(0, 1); glVertex(x, y + height)
-    glEnd()
+    def run(self):
+        while True:
+            # Main game loop
+            self.handle_events()
+            self.clear_screen()
 
-    glDisable(GL_BLEND)
-    glDisable(GL_TEXTURE_2D)
-    glDeleteTextures(1, [texid])
+            # Draw bar and text
+            self.draw_content()
 
-# The main function where the Pygame and OpenGL setup happens, as well as the main game loop
-def main():
-    pygame.init()  # Pygame initialization
-    display = (800, 600)  # Defining the size of the display
-    screen = pygame.display.set_mode(display, DOUBLEBUF | OPENGL)  # Setting up the display
-    gluPerspective(45, (display[0] / display[1]), 0.1, 50.0)  # Setting up the perspective for OpenGL
-    glTranslatef(-0.5, -1.0, -5)  # Shifting the perspective
+            # Update screen
+            pygame.display.flip()
 
-    font = pygame.font.Font(None, 36)  # Setting up the font for text rendering
-    text_color = (255, 255, 255)  # Color of the text
-    bar_color = (0, 1, 1)  # Color of the bar
+            # Pause for 10 milliseconds
+            pygame.time.wait(10)
 
-    # Main game loop
-    while True:
+    def handle_events(self):
         for event in pygame.event.get():
             # Close the program when the exit button is pressed
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
 
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)  # Clear the screen
+    def clear_screen(self):
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        # Get raw magnetic field data from the SenseHat module
-        raw = sense.get_compass_raw()
-        total_magnetic_strength = np.linalg.norm(list(raw.values()))  # Calculating the total magnetic strength
+    def draw_content(self):
+        try:
+            raw = self.sense.get_compass_raw()
+            total_magnetic_strength = np.linalg.norm(list(raw.values()))
+        except SenseHatError as err:
+            sys.exit(f"Failed to get data from SenseHat: {err}")
 
         # Scale the bar height according to the total magnetic field strength
         bar_height = total_magnetic_strength / 100
-        draw_bar(bar_height, bar_color)  # Draw the bar
-
-        # Switch to 2D mode to display the text
-        glMatrixMode(GL_PROJECTION)
-        glPushMatrix()
-        glLoadIdentity()
-        gluOrtho2D(0, display[0], 0, display[1])
-        glMatrixMode(GL_MODELVIEW)
-        glPushMatrix()
-        glLoadIdentity()
+        self.draw_bar(bar_height, self.bar_color)
 
         # Creating text strings for the total magnetic strength and its components along X, Y, and Z axes
         total_magnetic_strength_text = f"Total Magnetic Field Strength (µT): {total_magnetic_strength:.2f}"
@@ -114,26 +86,89 @@ def main():
         y_text = f"Y: {raw['y']:.2f} µT"
         z_text = f"Z: {raw['z']:.2f} µT"
 
-        # Display the text strings on the screen
-        draw_text(total_magnetic_strength_text, 10, display[1] - 50, font, text_color)
-        draw_text(x_text, 10, display[1] - 90, font, text_color)
-        draw_text(y_text, 10, display[1] - 130, font, text_color)
-        draw_text(z_text, 10, display[1] - 170, font, text_color)
+        # Switch to 2D mode to display the text
+        self.switch_to_2d()
+        self.draw_text(total_magnetic_strength_text, 10, self.display[1] - 50)
+        self.draw_text(x_text, 10, self.display[1] - 90)
+        self.draw_text(y_text, 10, self.display[1] - 130)
+        self.draw_text(z_text, 10, self.display[1] - 170)
+        self.draw_bar_labels()
+        self.switch_to_3d()
 
-        # Display labels for the bar graph
-        draw_text("Total Field Strength", 90, 30, font, bar_color)
-        draw_text("X", 30, 30, font, (1, 0, 0))
-        draw_text("Y", 50, 30, font, (0, 1, 0))
-        draw_text("Z", 70, 30, font, (0, 0, 1))
+    def draw_bar(self, height, color):
+        glColor3f(*color)
+        glBegin(GL_QUADS)
 
-        # Switch back to 3D mode
+        # The vertices for each face of the bar are defined here, with each face being a quadrilateral
+        # Front face
+        self.draw_face(0, 0, 0, 1, 0, 0, 1, height, 0, 0, height, 0)
+
+        # Back face
+        self.draw_face(0, 0, -1, 1, 0, -1, 1, height, -1, 0, height, -1)
+
+        # Left face
+        self.draw_face(0, 0, 0, 0, 0, -1, 0, height, -1, 0, height, 0)
+
+        # Right face
+        self.draw_face(1, 0, 0, 1, 0, -1, 1, height, -1, 1, height, 0)
+
+        glEnd()
+
+    def draw_face(self, *vertices):
+        for i in range(0, len(vertices), 3):
+            glVertex3f(*vertices[i:i+3])
+
+    def draw_text(self, text, x, y):
+        text_surface = self.font.render(text, True, self.text_color)
+        text_data = pygame.image.tostring(text_surface, "RGBA", True)
+        width, height = text_surface.get_size()
+
+        glEnable(GL_TEXTURE_2D)
+        texid = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, texid)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, text_data)
+
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        glBindTexture(GL_TEXTURE_2D, texid)
+        glBegin(GL_QUADS)
+        self.draw_quad(x, y, width, height)
+        glEnd()
+
+        glDisable(GL_BLEND)
+        glDisable(GL_TEXTURE_2D)
+        glDeleteTextures(1, [texid])
+
+    def draw_quad(self, x, y, width, height):
+        glTexCoord(0, 0); glVertex(x, y)
+        glTexCoord(1, 0); glVertex(x + width, y)
+        glTexCoord(1, 1); glVertex(x + width, y + height)
+        glTexCoord(0, 1); glVertex(x, y + height)
+
+    def draw_bar_labels(self):
+        self.draw_text("Total Field Strength", 90, 30)
+        self.draw_text("X", 30, 30)
+        self.draw_text("Y", 50, 30)
+        self.draw_text("Z", 70, 30)
+
+    def switch_to_2d(self):
+        glMatrixMode(GL_PROJECTION)
+        glPushMatrix()
+        glLoadIdentity()
+        gluOrtho2D(0, self.display[0], 0, self.display[1])
+        glMatrixMode(GL_MODELVIEW)
+        glPushMatrix()
+        glLoadIdentity()
+
+    def switch_to_3d(self):
         glMatrixMode(GL_PROJECTION)
         glPopMatrix()
         glMatrixMode(GL_MODELVIEW)
         glPopMatrix()
 
-        pygame.display.flip()  # Update the screen
-        pygame.time.wait(10)  # Pause for 10 milliseconds
-
 if __name__ == "__main__":
-    main()
+    app = MyPygameApp()
+    app.run()

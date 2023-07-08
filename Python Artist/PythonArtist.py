@@ -1,4 +1,4 @@
-# The following program was created using GPT-4 on June 15, 2023.
+# PythonArtist was created with GPT-4 on June 15, 2023.
 # This program is a simple paint application created using the tkinter library in Python. It allows users to draw on a canvas using various tools such as a brush, line,
 # rectangle, and eraser. Users can also choose the brush color and size, clear the canvas, undo previous actions, save the drawing as an image, and load an image to edit.
 
@@ -6,124 +6,116 @@ import tkinter as tk
 from tkinter import colorchooser, filedialog
 from PIL import ImageDraw, Image, ImageTk
 
-def paint(event):
-    global lastx, lasty, draw
-    x, y = event.x, event.y
-    if lastx is not None and lasty is not None:
-        if current_tool.get() == "brush":
-            draw.line((lastx, lasty, x, y), fill=brush_color.get(), width=brush_size.get())
-            canvas.create_line(lastx, lasty, x, y, fill=brush_color.get(), width=brush_size.get())
-        elif current_tool.get() == "line":
-            canvas.delete("temp_line")
-            canvas.create_line(startx, starty, x, y, tags="temp_line", fill=brush_color.get(), width=brush_size.get())
-        elif current_tool.get() == "eraser":
-            draw.line((lastx,lasty,x,y),fill="white",width=brush_size.get())
-            canvas.create_line(lastx,lasty,x,y,fill="white",width=brush_size.get())
-    lastx,lasty=x,y
+class PaintApp:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("Paint")
+        self.current_tool=tk.StringVar(value="brush")
+        self.brush_color=tk.StringVar(value="black")
+        self.brush_size=tk.IntVar(value=5)
+        self.lastx = self.lasty = self.startx = self.starty = None
+        self.create_widgets()
+        self.image = Image.new("RGB",(400,400),"white")
+        self.draw = ImageDraw.Draw(self.image)
+        self.undo_stack=[]
+        self.root.mainloop()
 
-def reset_coords(event):
-    global startx,starty
-    startx,starty=event.x,event.y
+    def create_widgets(self):
+        # Canvas Frame
+        self.canvas_frame=tk.Frame(self.root,bd=2,bg="black")
+        self.canvas_frame.pack(padx=10,pady=10)
+        self.canvas=tk.Canvas(self.canvas_frame,width=400,height=400,bg="white")
+        self.canvas.pack(expand=tk.YES,fill=tk.BOTH)
+        self.canvas.bind("<B1-Motion>",self.paint)
+        self.canvas.bind("<Button-1>",self.reset_coords)
+        self.canvas.bind("<ButtonRelease-1>",self.draw_shape)
 
-def draw_shape(event):
-    global draw
-    x,y=event.x,event.y
-    if current_tool.get() == "line":
-        canvas.delete("temp_line")
-        draw.line((startx,starty,x,y),fill=brush_color.get(),width=brush_size.get())
-        canvas.create_line(startx,starty,x,y,fill=brush_color.get(),width=brush_size.get())
-    elif current_tool.get() == "rectangle":
-        draw.rectangle((startx,starty,x,y),outline=brush_color.get(),width=brush_size.get())
-        canvas.create_rectangle(startx,starty,x,y,outline=brush_color.get(),width=brush_size.get())
+        # Tools Frame
+        self.tool_frame=tk.Frame(self.root)
+        self.tool_frame.pack(side=tk.TOP)
+        tools=["brush","line","rectangle","eraser"]
+        for tool in tools:
+            b=tk.Radiobutton(self.tool_frame,text=tool.capitalize(),variable=self.current_tool,value=tool)
+            b.pack(side=tk.LEFT)
+        self.color_button=tk.Button(self.tool_frame,text="Choose Color",command=self.choose_color)
+        self.color_button.pack(side=tk.LEFT)
 
-def clear_canvas():
-    global draw
-    canvas.delete("all")
-    draw.rectangle((0,0,image.width,image.height),fill="white")
+        # Size Frame
+        self.size_frame=tk.Frame(self.root)
+        self.size_frame.pack(side=tk.TOP)
+        sizes=[1,3,5,7,9]
+        for size in sizes:
+            b=tk.Radiobutton(self.size_frame,text=str(size),variable=self.brush_size,value=size)
+            b.pack(side=tk.LEFT)
 
-def undo():
-    global undo_stack
-    if len(undo_stack) > 0:
-        img = undo_stack.pop()
-        image.paste(img)
-        canvas.image = ImageTk.PhotoImage(image)
-        canvas.create_image(0,0,image=canvas.image,anchor=tk.NW)
+        # Bottom Buttons
+        self.clear_button=tk.Button(self.root,text="Clear",command=self.clear_canvas)
+        self.clear_button.pack(side=tk.BOTTOM)
+        self.undo_button=tk.Button(self.root,text="Undo",command=self.undo)
+        self.undo_button.pack(side=tk.BOTTOM)
+        self.save_button=tk.Button(self.root,text="Save",command=self.save)
+        self.save_button.pack(side=tk.BOTTOM)
+        self.load_button=tk.Button(self.root,text="Load",command=self.load)
+        self.load_button.pack(side=tk.BOTTOM)
+        self.message=tk.Label(self.root,text="Press and Drag the mouse to draw")
+        self.message.pack(side=tk.BOTTOM)
 
-def save():
-    filename = filedialog.asksaveasfilename(defaultextension=".png")
-    if filename:
-        image.save(filename)
+    def paint(self, event):
+        x, y = event.x, event.y
+        if self.lastx is not None and self.lasty is not None:
+            if self.current_tool.get() == "brush":
+                self.draw.line((self.lastx, self.lasty, x, y), fill=self.brush_color.get(), width=self.brush_size.get())
+                self.canvas.create_line(self.lastx, self.lasty, x, y, fill=self.brush_color.get(), width=self.brush_size.get())
+            elif self.current_tool.get() == "line":
+                self.canvas.delete("temp_line")
+                self.canvas.create_line(self.startx, self.starty, x, y, tags="temp_line", fill=self.brush_color.get(), width=self.brush_size.get())
+            elif self.current_tool.get() == "eraser":
+                self.draw.line((self.lastx,self.lasty,x,y),fill="white",width=self.brush_size.get())
+                self.canvas.create_line(self.lastx,self.lasty,x,y,fill="white",width=self.brush_size.get())
+        self.lastx,self.lasty=x,y
 
-def load():
-    global image,draw
-    filename = filedialog.askopenfilename(filetypes=[("Image Files","*.png;*.jpg;*.jpeg")])
-    if filename:
-        clear_canvas()
-        image = Image.open(filename)
-        draw = ImageDraw.Draw(image)
-        canvas.image = ImageTk.PhotoImage(image)
-        canvas.create_image(0,0,image=canvas.image,anchor=tk.NW)
+    def reset_coords(self, event):
+        self.startx,self.starty=self.lastx,self.lasty=event.x,event.y
 
-def choose_color():
-    color = colorchooser.askcolor()[1]
-    if color:
-        brush_color.set(color)
+    def draw_shape(self, event):
+        x,y=event.x,event.y
+        if self.current_tool.get() == "line":
+            self.canvas.delete("temp_line")
+            self.draw.line((self.startx,self.starty,x,y),fill=self.brush_color.get(),width=self.brush_size.get())
+            self.canvas.create_line(self.startx,self.starty,x,y,fill=self.brush_color.get(),width=self.brush_size.get())
+        elif self.current_tool.get() == "rectangle":
+            self.draw.rectangle((self.startx,self.starty,x,y),outline=self.brush_color.get(),width=self.brush_size.get())
+            self.canvas.create_rectangle(self.startx,self.starty,x,y,outline=self.brush_color.get(),width=self.brush_size.get())
 
-root = tk.Tk()
-root.title("Paint")
+    def clear_canvas(self):
+        self.canvas.delete("all")
+        self.draw.rectangle((0,0,self.image.width,self.image.height),fill="white")
 
-lastx,lasty=None,None
-startx,starty=None,None
+    def undo(self):
+        if len(self.undo_stack) > 0:
+            img = self.undo_stack.pop()
+            self.image.paste(img)
+            self.canvas.image = ImageTk.PhotoImage(self.image)
+            self.canvas.create_image(0,0,image=self.canvas.image,anchor=tk.NW)
 
-current_tool=tk.StringVar(value="brush")
-brush_color=tk.StringVar(value="black")
-brush_size=tk.IntVar(value=5)
+    def save(self):
+        filename = filedialog.asksaveasfilename(defaultextension=".png")
+        if filename:
+            self.image.save(filename)
 
-canvas_frame=tk.Frame(root,bd=2,bg="black")
-canvas_frame.pack(padx=10,pady=10)
+    def load(self):
+        filename = filedialog.askopenfilename(filetypes=[("Image Files","*.png;*.jpg;*.jpeg")])
+        if filename:
+            self.clear_canvas()
+            self.image = Image.open(filename)
+            self.draw = ImageDraw.Draw(self.image)
+            self.canvas.image = ImageTk.PhotoImage(self.image)
+            self.canvas.create_image(0,0,image=self.canvas.image,anchor=tk.NW)
 
-canvas=tk.Canvas(canvas_frame,width=400,height=400,bg="white")
-canvas.pack(expand=tk.YES,fill=tk.BOTH)
-canvas.bind("<B1-Motion>",paint)
-canvas.bind("<Button-1>",reset_coords)
-canvas.bind("<ButtonRelease-1>",draw_shape)
+    def choose_color(self):
+        color = colorchooser.askcolor()[1]
+        if color:
+            self.brush_color.set(color)
 
-image = Image.new("RGB",(400,400),"white")
-draw = ImageDraw.Draw(image)
-undo_stack=[]
-
-tool_frame=tk.Frame(root)
-tool_frame.pack(side=tk.TOP)
-
-tools=["brush","line","rectangle","eraser"]
-for tool in tools:
-    b=tk.Radiobutton(tool_frame,text=tool.capitalize(),variable=current_tool,value=tool)
-    b.pack(side=tk.LEFT)
-
-color_button=tk.Button(tool_frame,text="Choose Color",command=choose_color)
-color_button.pack(side=tk.LEFT)
-
-size_frame=tk.Frame(root)
-size_frame.pack(side=tk.TOP)
-
-sizes=[1,3,5,7,9]
-for size in sizes:
-    b=tk.Radiobutton(size_frame,text=str(size),variable=brush_size,value=size)
-    b.pack(side=tk.LEFT)
-
-clear_button=tk.Button(root,text="Clear",command=clear_canvas)
-clear_button.pack(side=tk.BOTTOM)
-
-undo_button=tk.Button(root,text="Undo",command=undo)
-undo_button.pack(side=tk.BOTTOM)
-
-save_button=tk.Button(root,text="Save",command=save)
-save_button.pack(side=tk.BOTTOM)
-
-load_button=tk.Button(root,text="Load",command=load)
-load_button.pack(side=tk.BOTTOM)
-
-message=tk.Label(root,text="Press and Drag the mouse to draw")
-message.pack(side=tk.BOTTOM)
-
-root.mainloop()
+if __name__ == "__main__":
+    PaintApp()

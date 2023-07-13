@@ -1,87 +1,97 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-import matplotlib.cm as cm
+from mpl_toolkits.mplot3d import Axes3D
 
-def proj(mat):
-    """ Project from 4D to 3D. """
-    return np.array([
-        [1, 0, 0, 0],
-        [0, 1, 0, 0],
-        [0, 0, 1, 0]
-    ]) @ mat
-
+# Function for 4D rotation
 def rotation_matrix(t):
-    """ Generate a 4D rotation matrix. """
     return np.array([
-        [np.cos(t), 0, 0, -np.sin(t)],
-        [0, np.cos(t), -np.sin(t), 0],
-        [0, np.sin(t), np.cos(t), 0],
-        [np.sin(t), 0, 0, np.cos(t)]
+        [np.cos(t), 0, -np.sin(t), 0],
+        [0, np.cos(t), 0, -np.sin(t)],
+        [np.sin(t), 0, np.cos(t), 0],
+        [0, np.sin(t), 0, np.cos(t)]
     ])
 
-def tesseract_points():
-    """ Generate the vertices of a tesseract. """
-    return np.array([
-        [1, 1, 1, 1],
-        [-1, 1, 1, 1],
-        [1, -1, 1, 1],
-        [-1, -1, 1, 1],
-        [1, 1, -1, 1],
-        [-1, 1, -1, 1],
-        [1, -1, -1, 1],
-        [-1, -1, -1, 1],
-        [1, 1, 1, -1],
-        [-1, 1, 1, -1],
-        [1, -1, 1, -1],
-        [-1, -1, 1, -1],
-        [1, 1, -1, -1],
-        [-1, 1, -1, -1],
-        [1, -1, -1, -1],
-        [-1, -1, -1, -1],
-    ]).T
+# Function for 4D to 3D projection
+def proj(mat):
+    z = 1/(3 - mat[3,:])
+    return np.array([mat[0]*z, mat[1]*z, mat[2]*z])
 
-def draw_edges(points, ax):
-    """ Draw the edges of the tesseract. """
-    idx_pairs = [
-        (0, 1), (1, 3), (3, 2), (2, 0),   # front square
-        (4, 5), (5, 7), (7, 6), (6, 4),   # back square
-        (0, 4), (1, 5), (2, 6), (3, 7),   # connecting lines
-        (8, 9), (9, 11), (11, 10), (10, 8),   # front square (z=-1)
-        (12, 13), (13, 15), (15, 14), (14, 12),  # back square (z=-1)
-        (8, 12), (9, 13), (10, 14), (11, 15)   # connecting lines (z=-1)
-    ]
+# Tesseract points (4D coordinates)
+tesseract_points = np.array([
+    [-1, -1, -1, 1],
+    [-1, -1, 1, 1],
+    [-1, 1, 1, 1],
+    [-1, 1, -1, 1],
+    [1, -1, -1, 1],
+    [1, -1, 1, 1],
+    [1, 1, 1, 1],
+    [1, 1, -1, 1],
+    [-1, -1, -1, -1],
+    [-1, -1, 1, -1],
+    [-1, 1, 1, -1],
+    [-1, 1, -1, -1],
+    [1, -1, -1, -1],
+    [1, -1, 1, -1],
+    [1, 1, 1, -1],
+    [1, 1, -1, -1]
+]).T
 
-    for i, j in idx_pairs:
-        ax.plot([points[0, i], points[0, j]],
-                [points[1, i], points[1, j]],
-                [points[2, i], points[2, j]], color='r', alpha=0.2)
+# Edges of the tesseract
+edges = [
+    (0, 1), (1, 2), (2, 3), (3, 0),  # front face
+    (4, 5), (5, 6), (6, 7), (7, 4),  # back face
+    (0, 4), (1, 5), (2, 6), (3, 7),  # connecting edges
+    (8, 9), (9, 10), (10, 11), (11, 8),  # bottom face
+    (12, 13), (13, 14), (14, 15), (15, 12),  # top face
+    (8, 12), (9, 13), (10, 14), (11, 15)  # connecting edges
+]
 
+# Create figure
+fig = plt.figure(figsize=(8, 4))
+
+# Add subplot for rotating tesseract
+ax1 = fig.add_subplot(1, 2, 1, projection='3d')
+ax1.set_xlim([-2, 2])
+ax1.set_ylim([-2, 2])
+ax1.set_zlim([-2, 2])
+ax1.set_title("Rotating Tesseract")
+
+# Add subplot for stationary tesseract
+ax2 = fig.add_subplot(1, 2, 2, projection='3d')
+ax2.set_xlim([-2, 2])
+ax2.set_ylim([-2, 2])
+ax2.set_zlim([-2, 2])
+ax2.set_title("Stationary Tesseract")
+
+# Lines for the rotating tesseract
+lines1 = [ax1.plot([], [], [], color='blue')[0] for _ in edges]
+
+# Lines for the stationary tesseract
+lines2 = [ax2.plot([], [], [], color='red')[0] for _ in edges]
+
+# Initialization function for the animation
+def init():
+    return lines1 + lines2
+
+# Update function for the animation
 def update(t):
-    """ Update function for animation. """
-    ax.cla()
-    points = proj(rotation_matrix(t) @ tesseract_points())
+    # Apply rotation and projection
+    points1 = proj(rotation_matrix(t) @ tesseract_points)
+    points2 = proj(tesseract_points)
 
-    # Normalize the points for color mapping and discard the fourth dimension
-    norm = plt.Normalize(-1,1)
-    colors = cm.viridis(norm(points.T[:, 0]))
+    # Update line positions
+    for line, edge in zip(lines1, edges):
+        line.set_data(points1[0, edge], points1[1, edge])
+        line.set_3d_properties(points1[2, edge])
+    for line, edge in zip(lines2, edges):
+        line.set_data(points2[0, edge], points2[1, edge])
+        line.set_3d_properties(points2[2, edge])
 
-    ax.scatter(points[0, :], points[1, :], points[2, :], color=colors)
-    draw_edges(points, ax)
+    return lines1 + lines2
 
-    # Label the vertices
-    for i in range(points.shape[1]):
-        ax.text(points[0, i], points[1, i], points[2, i], f'v{i}', color='blue')
+# Create animation
+ani = animation.FuncAnimation(fig, update, frames=np.linspace(0, 2*np.pi, 200), init_func=init, blit=True)
 
-    ax.set_xlim([-2, 2])
-    ax.set_ylim([-2, 2])
-    ax.set_zlim([-2, 2])
-
-if __name__ == "__main__":
-    try:
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        ani = animation.FuncAnimation(fig, update, frames=np.linspace(0, 2*np.pi, 100), interval=100)
-        plt.show()
-    except Exception as e:
-        print(f"An error occurred: {str(e)}")
+# Display the animation
+plt.show()

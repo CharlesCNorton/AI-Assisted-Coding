@@ -1,6 +1,6 @@
 #LunarPhase
 #Moon Phase Checker application with menu, moon phase calculation, and display functionality.
-#Made with GPT-4 on June 19th 2023.
+#Updated with improved error handling, robustness, and implementation.
 import datetime
 import ephem
 from rich.console import Console
@@ -12,36 +12,42 @@ from prompt_toolkit import prompt
 from prompt_toolkit.shortcuts import clear, print_formatted_text as pft, set_title
 import skyfield
 from skyfield.api import Topos, load
+from skyfield.errors import EphemerisRangeError
+
 ts = load.timescale()
-console = Console()
+
+class MoonInfoError(Exception):
+    pass
+
 def display_menu(console):
     menu_text = Text("MENU", justify="center", style="bold underline white")
-    menu_text.append("\n\n1. Get Moon Phase for specific date", style="white")
-    menu_text.append("\n2. Get Moon Phase for today", style="white")
-    menu_text.append("\n3. Exit", style="white")
+    menu_text.append("\\n\\n1. Get Moon Phase for specific date", style="white")
+    menu_text.append("\\n2. Get Moon Phase for today", style="white")
+    menu_text.append("\\n3. Exit", style="white")
     console.print(Panel(menu_text, style="grey70"))
+
 def get_moon_info(date):
     try:
         observer = ephem.Observer()
-        observer.date = ephem.Date(date)
+        observer.date = ephem.Date(date.strftime('%Y/%m/%d'))
         moon = ephem.Moon(observer)
-        previous_new_moon = ephem.previous_new_moon(date)
-        next_new_moon = ephem.next_new_moon(date)
+        previous_new_moon = ephem.previous_new_moon(observer.date)
+        next_new_moon = ephem.next_new_moon(observer.date)
         phase = (observer.date - previous_new_moon) / (next_new_moon - previous_new_moon)
         planets = load('de421.bsp')
         earth, moon = planets['earth'], planets['moon']
         t = ts.utc(date.year, date.month, date.day)
         geocentric = earth.at(t).observe(moon)
+        _, _, distance = geocentric.radec()
     except (ValueError, TypeError) as e:
-        console.print(f"[bold red]Error occurred while calculating moon phase: {str(e)}[/bold red]")
-        console.print(f"[bold red]Please ensure the date is in the correct format (YYYY/MM/DD).[/bold red]")
-        return None
-    except skyfield.errors.EphemerisRangeError as e:
-        console.print(f"[bold red]The date provided is out of range. Please provide a date between 1899-07-29 and 2053-10-09.[/bold red]")
-        return None
+        raise MoonInfoError(f"Error occurred while calculating moon phase: {str(e)}")
+    except EphemerisRangeError as e:
+        raise MoonInfoError(f"The date provided is out of range. Please provide a date between 1899-07-29 and 2053-10-09.")
     except Exception as e:
-        console.print(f"[bold red]An unexpected error occurred: {str(e)}[/bold red]")
-        return None
+        raise MoonInfoError(f"An unexpected error occurred: {str(e)}")
+    return phase, distance.km
+
+def get_phase_name_and_desc(phase):
     phase_info = {
         'New Moon': ('🌑', 'Moon is directly between the Earth and the Sun and not visible from Earth.'),
         'Waxing Crescent': ('🌒', 'Moon is becoming more illuminated by direct sunlight.'),
@@ -71,19 +77,14 @@ def get_moon_info(date):
         phase_name = 'Waning Crescent'
     else:
         phase_name = 'New Moon'
-    moon_pic, moon_desc = phase_info[phase_name]
-    planets = load('de421.bsp')
-    earth, moon = planets['earth'], planets['moon']
-    t = ts.utc(date.year, date.month, date.day)
-    geocentric = earth.at(t).observe(moon)
-    _, _, distance = geocentric.radec()
-    return phase_name, phase, moon_pic, moon_desc, distance.km
+    return phase_name, *phase_info[phase_name]
+
 def validate_date(date_str):
     try:
-        datetime.datetime.strptime(date_str, '%Y/%m/%d')
-        return True
+        return datetime.datetime.strptime(date_str, '%Y/%m/%d')
     except ValueError:
-        return False
+        return None
+
 def main():
     set_title("Moon Phase Checker")
     console = Console()
@@ -93,25 +94,27 @@ def main():
         choice = prompt("Select your choice: ")
         if choice == '1':
             date_str = console.input("Enter the date [bold cyan](yyyy/mm/dd)[/bold cyan]: ")
-            if not validate_date(date_str):
+            date = validate_date(date_str)
+            if date is None:
                 console.print("[bold red]Invalid date format. Please use yyyy/mm/dd.[/bold red]")
                 continue
-            show_moon_info(date_str, console)
+            show_moon_info(date, console)
         elif choice == '2':
-            date_str = datetime.datetime.now().strftime('%Y/%m/%d')
-            show_moon_info(date_str, console)
+            date = datetime.datetime.now()
+            show_moon_info(date, console)
         elif choice == '3':
             break
         else:
             console.print("[bold red]Invalid choice. Please try again.[/bold red]")
-            continue
-def show_moon_info(date_str, console):
-    date = datetime.datetime.strptime(date_str, '%Y/%m/%d')
-    moon_info = get_moon_info(date)
-    if moon_info is None:
-        console.print("[bold red]Unable to fetch moon info. Please try again later.[/bold red]")
+
+def show_moon_info(date, console):
+    try:
+        phase, distance = get_moon_info(date)
+        phase_name, moon_pic, moon_desc = get_phase_name_and_desc(phase)
+    except MoonInfoError as e:
+        console.print(f"[bold red]{str(e)}[/bold red]")
         return
-    phase, percent_illuminated, moon_pic, moon_desc, distance = moon_info
+
     table = Table(show_header=True, header_style="bold magenta")
     table.add_column("Date", style="dim", width=12)
     table.add_column("Moon Phase", style="dim", width=20)
@@ -119,9 +122,9 @@ def show_moon_info(date_str, console):
     table.add_column("Moon", style="dim", width=8)
     table.add_column("Distance (km)", style="dim", width=15)
     table.add_row(
-        date_str,
-        phase,
-        f"{min(100, percent_illuminated * 100):.2f}%",
+        date.strftime('%Y/%m/%d'),
+        phase_name,
+        f"{min(100, phase * 100):.2f}%",
         moon_pic,
         f"{distance:.2f}"
     )
@@ -130,6 +133,7 @@ def show_moon_info(date_str, console):
     rprint(f"[bold cyan]{moon_desc}[/bold cyan]")
     console.print("Press any key to return to the menu...", style="white")
     input()
+
 if __name__ == "__main__":
     try:
         main()

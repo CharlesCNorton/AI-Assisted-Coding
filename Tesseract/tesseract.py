@@ -5,11 +5,12 @@ from mpl_toolkits.mplot3d import Axes3D
 
 # Function for 4D rotation
 def rotation_matrix(t):
+    cos_t, sin_t = np.cos(t), np.sin(t)
     return np.array([
-        [np.cos(t), 0, -np.sin(t), 0],
-        [0, np.cos(t), 0, -np.sin(t)],
-        [np.sin(t), 0, np.cos(t), 0],
-        [0, np.sin(t), 0, np.cos(t)]
+        [cos_t, 0, -sin_t, 0],
+        [0, cos_t, 0, -sin_t],
+        [sin_t, 0, cos_t, 0],
+        [0, sin_t, 0, cos_t]
     ])
 
 # Function for 4D to 3D projection
@@ -47,6 +48,9 @@ edges = [
     (8, 12), (9, 13), (10, 14), (11, 15)  # connecting edges
 ]
 
+# Precompute stationary points
+stationary_points = proj(tesseract_points)
+
 # Create figure
 fig = plt.figure(figsize=(8, 4))
 
@@ -77,21 +81,16 @@ def init():
 # Update function for the animation
 def update(t):
     # Apply rotation and projection
-    points1 = proj(rotation_matrix(t) @ tesseract_points)
-    points2 = proj(tesseract_points)
+    rotated_points = proj(rotation_matrix(t) @ tesseract_points)
 
     # Update line positions
-    for line, edge in zip(lines1, edges):
-        line.set_data(points1[0, edge], points1[1, edge])
-        line.set_3d_properties(points1[2, edge])
-    for line, edge in zip(lines2, edges):
-        line.set_data(points2[0, edge], points2[1, edge])
-        line.set_3d_properties(points2[2, edge])
+    [line.set_data(rotated_points[0, edge], rotated_points[1, edge]) or line.set_3d_properties(rotated_points[2, edge]) for line, edge in zip(lines1, edges)]
+    [line.set_data(stationary_points[0, edge], stationary_points[1, edge]) or line.set_3d_properties(stationary_points[2, edge]) for line, edge in zip(lines2, edges)]
 
     return lines1 + lines2
 
 # Create animation
-ani = animation.FuncAnimation(fig, update, frames=np.linspace(0, 2*np.pi, 200), init_func=init, blit=True)
+ani = animation.FuncAnimation(fig, update, frames=np.linspace(0, 2*np.pi, 200, endpoint=False), init_func=init, blit=True)
 
 # Display the animation
 plt.show()

@@ -1,94 +1,95 @@
 import requests
+import json
+import websocket
+import threading
 import time
-from rich import print as rprint
-from rich.panel import Panel
-from rich.tree import Tree
+from rich.console import Console
+from rich.json import JSON
 
-# Base URL for the BlockCypher Bitcoin API
 API_URL = "https://api.blockcypher.com/v1/btc/main"
+WS_URL = "wss://ws.blockchain.info/inv"
 
-# Function to pretty print JSON data in a tree structure
-def pretty_print_json(data, tree=Tree("")):
-    # Loop through each key-value pair in the data
-    for key, value in data.items():
-        # If value is a dictionary, create a new subtree for it
-        if isinstance(value, dict):
-            subtree = Tree(f"[blue]{key}[/blue]")
-            pretty_print_json(value, subtree)
-            tree.add(subtree)
-        # If value is a list, loop through items in the list
-        elif isinstance(value, list):
-            for i, item in enumerate(value):
-                # If item is a dictionary, create a new subtree for it
-                if isinstance(item, dict):
-                    subtree = Tree(f"[blue]{key} ({i+1})[/blue]")
-                    pretty_print_json(item, subtree)
-                    tree.add(subtree)
-                else:
-                    tree.add(f"[green]{key} ({i+1}):[/green] {item}")
-        # If value is not a dictionary or list, just print it
-        else:
-            tree.add(f"[green]{key}:[/green] {value}")
-    # Use rich library to print the tree in a pretty way
-    rprint(Panel(tree))
+console = Console()
 
-# Function to get the height of the latest block
-def get_latest_block_height():
-    response = requests.get(API_URL)
+def pretty_print(data):
+    console.print(JSON(json.dumps(data, indent=4, sort_keys=True)))
+
+def get_block_overview():
+    block_height = input("Enter block height (or 'latest' for the latest block): ")
+    response = requests.get(f"{API_URL}/blocks/{block_height}")
     if response.status_code == 200:
-        data = response.json()
-        return data['height']
+        pretty_print(response.json())
     else:
-        rprint(f'Error {response.status_code}: Could not get latest block height')
-        return None
+        console.print(f"Error {response.status_code}: Could not get block {block_height} overview")
 
-# Function to get overview of a specific block
-def get_block_overview(block_height='latest'):
-    # If the user wants the latest block, get the height of the latest block
-    if block_height == 'latest':
-        block_height = get_latest_block_height()
-        if block_height is None:
-            return
-    # Send a GET request to the API
-    response = requests.get(f'{API_URL}/blocks/{block_height}')
-    if response.status_code != 200:
-        rprint(f'Error {response.status_code}: Could not get block {block_height} overview')
+def get_transaction_overview():
+    tx_hash = input("Enter transaction hash: ")
+    response = requests.get(f"{API_URL}/txs/{tx_hash}")
+    if response.status_code == 200:
+        pretty_print(response.json())
     else:
-        # Convert the response to JSON and pretty print it
-        block_data = response.json()
-        pretty_print_json(block_data)
+        console.print(f"Error {response.status_code}: Could not get transaction {tx_hash} overview")
 
-# Function to get overview of a specific transaction
-def get_transaction_overview(tx_hash):
-    response = requests.get(f'{API_URL}/txs/{tx_hash}')
-    if response.status_code != 200:
-        rprint(f'Error {response.status_code}: Could not get transaction {tx_hash} overview')
+def get_address_overview():
+    address = input("Enter Bitcoin address: ")
+    response = requests.get(f"{API_URL}/addrs/{address}")
+    if response.status_code == 200:
+        pretty_print(response.json())
     else:
-        transaction_data = response.json()
-        pretty_print_json(transaction_data)
+        console.print(f"Error {response.status_code}: Could not get address {address} overview")
 
-# Main function to run the block explorer
-def run_bit_explorer():
+def live_block_feed():
+    def on_message(ws, message):
+        message_json = json.loads(message)
+        if 'x' in message_json:
+            console.print(JSON(json.dumps(message_json['x'], indent=4)))
+
+    def on_error(ws, error):
+        print(f"Error occurred: {error}")
+
+    def on_close(ws, close_status_code, close_msg):
+        print(f"### Block feed closed ###\nClose code: {close_status_code}\nClose message: {close_msg}")
+
+    def on_open(ws):
+        def run(*args):
+            while True:
+                try:
+                    ws.send(json.dumps({"op":"blocks_sub"}))
+                    time.sleep(5)  # wait for 5 seconds
+                    ws.ping("keepalive")  # send a ping
+                except Exception as e:
+                    print(f"An error occurred: {e}")
+                    break
+        threading.Thread(target=run).start()
+
+    ws = websocket.WebSocketApp(WS_URL,
+                                on_message=on_message,
+                                on_error=on_error,
+                                on_close=on_close,
+                                on_open=on_open)
+    ws.run_forever()
+
+def main():
     while True:
-        rprint('BitExplorer - Your Bitcoin Block Explorer')
-        rprint('1. Get block overview')
-        rprint('2. Get transaction overview')
-        rprint('3. Quit')
-        user_choice = input('Enter your choice: ')
-
-        # Handle the user's choice
-        if user_choice == '1':
-            block_height = input("Enter block height (or 'latest' for the latest block): ")
-            get_block_overview(block_height)
-        elif user_choice == '2':
-            tx_hash = input("Enter transaction hash: ")
-            get_transaction_overview(tx_hash)
-        elif user_choice == '3':
+        print("Bitcoin Block Explorer")
+        print("1. Get block overview")
+        print("2. Get transaction overview")
+        print("3. Get address overview")
+        print("4. Live block feed")
+        print("5. Quit")
+        choice = input("Enter your choice: ")
+        if choice == '1':
+            get_block_overview()
+        elif choice == '2':
+            get_transaction_overview()
+        elif choice == '3':
+            get_address_overview()
+        elif choice == '4':
+            live_block_feed()
+        elif choice == '5':
             break
         else:
-            rprint('Invalid choice. Please choose a valid option.')
+            print("Invalid choice. Please choose again.")
 
-        # Delay to prevent rate limiting
-        time.sleep(1)
-
-run_bit_explorer()
+if __name__ == "__main__":
+    main()

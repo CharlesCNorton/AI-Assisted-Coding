@@ -10,56 +10,81 @@ API_URL = "https://api.blockcypher.com/v1/btc/main"
 WS_URL = "wss://ws.blockchain.info/inv"
 
 console = Console()
+lock = threading.Lock()
 
 def pretty_print(data):
-    console.print(JSON(json.dumps(data, indent=4, sort_keys=True)))
+    with lock:
+        console.print(JSON(json.dumps(data, indent=4, sort_keys=True)))
 
 def get_block_overview():
     block_height = input("Enter block height (or 'latest' for the latest block): ")
-    response = requests.get(f"{API_URL}/blocks/{block_height}")
-    if response.status_code == 200:
+    try:
+        response = requests.get(f"{API_URL}/blocks/{block_height}")
+        response.raise_for_status()
         pretty_print(response.json())
-    else:
-        console.print(f"Error {response.status_code}: Could not get block {block_height} overview")
+    except requests.exceptions.HTTPError as errh:
+        console.print(f"HTTP Error: {errh}")
+    except requests.exceptions.ConnectionError as errc:
+        console.print(f"Error Connecting: {errc}")
+    except requests.exceptions.Timeout as errt:
+        console.print(f"Timeout Error: {errt}")
+    except requests.exceptions.RequestException as err:
+        console.print(f"Something went wrong: {err}")
 
 def get_transaction_overview():
     tx_hash = input("Enter transaction hash: ")
-    response = requests.get(f"{API_URL}/txs/{tx_hash}")
-    if response.status_code == 200:
+    try:
+        response = requests.get(f"{API_URL}/txs/{tx_hash}")
+        response.raise_for_status()
         pretty_print(response.json())
-    else:
-        console.print(f"Error {response.status_code}: Could not get transaction {tx_hash} overview")
+    except requests.exceptions.HTTPError as errh:
+        console.print(f"HTTP Error: {errh}")
+    except requests.exceptions.ConnectionError as errc:
+        console.print(f"Error Connecting: {errc}")
+    except requests.exceptions.Timeout as errt:
+        console.print(f"Timeout Error: {errt}")
+    except requests.exceptions.RequestException as err:
+        console.print(f"Something went wrong: {err}")
 
 def get_address_overview():
     address = input("Enter Bitcoin address: ")
-    response = requests.get(f"{API_URL}/addrs/{address}")
-    if response.status_code == 200:
+    try:
+        response = requests.get(f"{API_URL}/addrs/{address}")
+        response.raise_for_status()
         pretty_print(response.json())
-    else:
-        console.print(f"Error {response.status_code}: Could not get address {address} overview")
+    except requests.exceptions.HTTPError as errh:
+        console.print(f"HTTP Error: {errh}")
+    except requests.exceptions.ConnectionError as errc:
+        console.print(f"Error Connecting: {errc}")
+    except requests.exceptions.Timeout as errt:
+        console.print(f"Timeout Error: {errt}")
+    except requests.exceptions.RequestException as err:
+        console.print(f"Something went wrong: {err}")
 
 def live_block_feed():
     def on_message(ws, message):
         message_json = json.loads(message)
         if 'x' in message_json:
-            console.print(JSON(json.dumps(message_json['x'], indent=4)))
+            pretty_print(message_json['x'])
 
     def on_error(ws, error):
-        print(f"Error occurred: {error}")
+        console.print(f"Error occurred: {error}")
 
     def on_close(ws, close_status_code, close_msg):
-        print(f"### Block feed closed ###\nClose code: {close_status_code}\nClose message: {close_msg}")
+        console.print(f"### Block feed closed ###\nClose code: {close_status_code}\nClose message: {close_msg}")
 
     def on_open(ws):
         def run(*args):
-            while True:
+            for i in range(3):  # retry 3 times
                 try:
                     ws.send(json.dumps({"op":"blocks_sub"}))
-                    time.sleep(5)  # wait for 5 seconds
+                    time.sleep(5)
                     ws.ping("keepalive")  # send a ping
-                except Exception as e:
-                    print(f"An error occurred: {e}")
                     break
+                except Exception as e:
+                    console.print(f"An error occurred: {e}")
+                    if i < 2:  # don't sleep on the last attempt
+                        time.sleep(10)
         threading.Thread(target=run).start()
 
     ws = websocket.WebSocketApp(WS_URL,
@@ -71,12 +96,12 @@ def live_block_feed():
 
 def main():
     while True:
-        print("Bitcoin Block Explorer")
-        print("1. Get block overview")
-        print("2. Get transaction overview")
-        print("3. Get address overview")
-        print("4. Live block feed")
-        print("5. Quit")
+        console.print("Bitcoin Block Explorer")
+        console.print("1. Get block overview")
+        console.print("2. Get transaction overview")
+        console.print("3. Get address overview")
+        console.print("4. Live block feed")
+        console.print("5. Quit")
         choice = input("Enter your choice: ")
         if choice == '1':
             get_block_overview()
@@ -89,7 +114,7 @@ def main():
         elif choice == '5':
             break
         else:
-            print("Invalid choice. Please choose again.")
+            console.print("Invalid choice. Please choose again.")
 
 if __name__ == "__main__":
     main()

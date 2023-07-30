@@ -26,6 +26,10 @@ kernel = np.array([[1, 1, 1],
                    [1, 0, 1],
                    [1, 1, 1]])
 
+# List to track the number of alive and dead cells at each generation
+alive_cells = [np.sum(grid)]
+dead_cells = [N*N - alive_cells[0]]
+
 def compute_next_generation(grid):
     """Return the next generation of the grid in the Game of Life."""
     # Count the number of live neighbors for each cell
@@ -40,7 +44,7 @@ def compute_next_generation(grid):
 
 # Set up the plot
 try:
-    fig, ax = plt.subplots(figsize=(8, 8))
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 16))
 except Exception as e:
     print("Error setting up the plot. Error: ", str(e))
     raise
@@ -49,13 +53,21 @@ except Exception as e:
 cmap = mcolors.LinearSegmentedColormap.from_list("MyCmap", ["black", "green"])
 
 try:
-    image = ax.imshow(grid, cmap=cmap, interpolation='nearest')
-    ax.set_xticks([])
-    ax.set_yticks([])
+    image = ax1.imshow(grid, cmap=cmap, interpolation='nearest')
+    ax1.set_xticks([])
+    ax1.set_yticks([])
 
     # Add a colorbar
-    cbar = plt.colorbar(image, ax=ax, ticks=[0, 1])
+    cbar = plt.colorbar(image, ax=ax1, ticks=[0, 1])
     cbar.ax.set_yticklabels(['Dead', 'Alive'])
+
+    # Initial plot for alive and dead cells over generations
+    ax2.set_title('Alive and Dead Cells over Generations')
+    ax2.set_xlabel('Generation')
+    ax2.set_ylabel('Number of Cells')
+    lines = ax2.plot(alive_cells, label='Alive')
+    lines += ax2.plot(dead_cells, label='Dead')
+    ax2.legend()
 except Exception as e:
     print("Error during plot rendering. Error: ", str(e))
     raise
@@ -64,7 +76,14 @@ def update_image(frame, grid, image):
     """Update the image for a new frame."""
     grid[:] = compute_next_generation(grid)
     image.set_array(grid)
-    return [image]
+    alive_cells.append(np.sum(grid))
+    dead_cells.append(N*N - alive_cells[-1])
+    for i, line in enumerate(lines):
+        line.set_ydata([alive_cells, dead_cells][i])
+        line.set_xdata(range(len(alive_cells)))
+    ax2.relim()
+    ax2.autoscale_view()
+    return [image] + lines
 
 # Start the animation
 try:

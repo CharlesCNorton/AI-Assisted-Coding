@@ -20,6 +20,31 @@ PADDLE_SPEED = 2
 BALL_SIZE = 10
 BALL_SPEED = 2
 
+class Paddle:
+    def __init__(self, x, y, speed):
+        self.rect = pygame.Rect(x, y, PADDLE_WIDTH, PADDLE_HEIGHT)
+        self.speed = speed
+
+    def move(self, dy):
+        if self.rect.top + dy > 0 and self.rect.bottom + dy < HEIGHT:
+            self.rect.y += dy
+
+class Ball:
+    def __init__(self, x, y, dx, dy):
+        self.rect = pygame.Rect(x, y, BALL_SIZE, BALL_SIZE)
+        self.dx = dx
+        self.dy = dy
+
+    def move(self):
+        self.rect.x += self.dx
+        self.rect.y += self.dy
+
+    def reset(self, x, y, dx, dy):
+        self.rect.x = x
+        self.rect.y = y
+        self.dx = dx
+        self.dy = dy
+
 try:
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
 except pygame.error as e:
@@ -37,12 +62,13 @@ BLUE = (0, 0, 255)
 BLACK = (0, 0, 0)
 
 # Paddles and ball
-paddle_a = pygame.Rect(10, HEIGHT / 2 - PADDLE_HEIGHT / 2, PADDLE_WIDTH, PADDLE_HEIGHT)
-paddle_b = pygame.Rect(WIDTH - 20, HEIGHT / 2 - PADDLE_HEIGHT / 2, PADDLE_WIDTH, PADDLE_HEIGHT)
-ball = pygame.Rect(WIDTH / 2 - BALL_SIZE / 2, HEIGHT / 2 - BALL_SIZE / 2, BALL_SIZE, BALL_SIZE)
+paddle_a = Paddle(10, HEIGHT / 2 - PADDLE_HEIGHT / 2, PADDLE_SPEED)
+paddle_b = Paddle(WIDTH - 20, HEIGHT / 2 - PADDLE_HEIGHT / 2, PADDLE_SPEED)
+ball = Ball(WIDTH / 2 - BALL_SIZE / 2, HEIGHT / 2 - BALL_SIZE / 2, BALL_SPEED, BALL_SPEED)
 
-ball_dx = BALL_SPEED
-ball_dy = BALL_SPEED
+# Scores
+score_a = 0
+score_b = 0
 
 def create_beep(frequency, duration):
     # create a beep sound with the pygame mixer
@@ -57,40 +83,45 @@ def create_beep(frequency, duration):
 
 beep_sound = create_beep(440, 0.1)
 
-def move_paddle(paddle, dy):
-    if paddle.top + dy > 0 and paddle.bottom + dy < HEIGHT:
-        paddle.y += dy
-
 def auto_play(paddle):
-    if paddle.centery < ball.centery:
-        move_paddle(paddle, PADDLE_SPEED)
-    if paddle.centery > ball.centery:
-        move_paddle(paddle, -PADDLE_SPEED)
+    if paddle.rect.centery < ball.rect.centery:
+        paddle.move(PADDLE_SPEED)
+    if paddle.rect.centery > ball.rect.centery:
+        paddle.move(-PADDLE_SPEED)
 
 def move_ball():
-    global ball_dx, ball_dy
+    global ball_dx, ball_dy, score_a, score_b
 
-    if ball.colliderect(paddle_a) or ball.colliderect(paddle_b):
-        ball_dx = -ball_dx
+    if ball.rect.colliderect(paddle_a.rect) or ball.rect.colliderect(paddle_b.rect):
+        ball.dx = -ball.dx
         if beep_sound:
             beep_sound.play()
 
-    if ball.top + ball_dy < 0 or ball.bottom + ball_dy > HEIGHT:
-        ball_dy = -ball_dy
+    if ball.rect.top + ball.dy < 0 or ball.rect.bottom + ball.dy > HEIGHT:
+        ball.dy = -ball.dy
 
-    ball.x += ball_dx
-    ball.y += ball_dy
+    ball.move()
+
+    if ball.rect.left < 0:
+        score_b += 1
+        ball.reset(WIDTH / 2 - BALL_SIZE / 2, HEIGHT / 2 - BALL_SIZE / 2, BALL_SPEED, BALL_SPEED)
+    elif ball.rect.right > WIDTH:
+        score_a += 1
+        ball.reset(WIDTH / 2 - BALL_SIZE / 2, HEIGHT / 2 - BALL_SIZE / 2, -BALL_SPEED, -BALL_SPEED)
 
 def draw():
     screen.fill(BLACK)
-    pygame.draw.rect(screen, RED, paddle_a)
-    pygame.draw.rect(screen, BLUE, paddle_b)
-    pygame.draw.rect(screen, WHITE, ball)
+    pygame.draw.rect(screen, RED, paddle_a.rect)
+    pygame.draw.rect(screen, BLUE, paddle_b.rect)
+    pygame.draw.rect(screen, WHITE, ball.rect)
+
+    font = pygame.font.Font(None, 36)
+    score_text = font.render(f"Player A: {score_a}   Player B: {score_b}", True, WHITE)
+    screen.blit(score_text, (WIDTH / 2 - score_text.get_width() / 2, 10))
+
     pygame.display.flip()
 
 def main(auto_play_enabled=False):
-    global ball_dx
-
     while True:
         for event in pygame.event.get():
             if event.type == QUIT:
@@ -100,26 +131,19 @@ def main(auto_play_enabled=False):
         keys = pygame.key.get_pressed()
 
         if keys[K_w]:
-            move_paddle(paddle_a, -PADDLE_SPEED)
+            paddle_a.move(-PADDLE_SPEED)
         if keys[K_s]:
-            move_paddle(paddle_a, PADDLE_SPEED)
+            paddle_a.move(PADDLE_SPEED)
 
         if auto_play_enabled:
             auto_play(paddle_b)
         else:
             if keys[K_UP]:
-                move_paddle(paddle_b, -PADDLE_SPEED)
+                paddle_b.move(-PADDLE_SPEED)
             if keys[K_DOWN]:
-                move_paddle(paddle_b, PADDLE_SPEED)
+                paddle_b.move(PADDLE_SPEED)
 
         move_ball()
-
-        if ball.left < 0 or ball.right > WIDTH:
-            ball.x = WIDTH / 2 - BALL_SIZE / 2
-            ball.y = HEIGHT / 2 - BALL_SIZE / 2
-            ball_dx = -ball_dx
-            ball_dy = BALL_SPEED if paddle_a.centery < ball.centery else -BALL_SPEED
-
         draw()
         clock.tick(60)
 

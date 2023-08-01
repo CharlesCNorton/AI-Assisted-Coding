@@ -1,14 +1,16 @@
+
 from pytube import YouTube, Playlist
 from pytube.exceptions import PytubeError
 import os
 import re
+import unittest
 
-def get_user_input(prompt, validation_func=None):
+def get_user_input(prompt, validation_func=None, error_message="Invalid input. Please try again."):
     while True:
         value = input(prompt)
         if validation_func is None or validation_func(value):
             return value
-        print("Invalid input. Please try again.")
+        print(error_message)
 
 def progress_function(stream, chunk, bytes_remaining):
     total_size = stream.filesize
@@ -20,13 +22,16 @@ def progress_function(stream, chunk, bytes_remaining):
     else:
         print(f"\rDownloading... completed", end='')
 
+def handle_error(e):
+    print(f"An error occurred: {type(e).__name__}, {str(e)}")
+
 def get_youtube_object(url):
     try:
         return YouTube(url, on_progress_callback=progress_function)
     except PytubeError as e:
-        print(f"Pytube error occurred: {type(e).__name__}, {str(e)}")
+        handle_error(e)
     except Exception as e:
-        print(f"An error occurred: {type(e).__name__}, {str(e)}")
+        handle_error(e)
 
 def get_youtube_stream(yt, audio_only):
     if audio_only:
@@ -51,7 +56,7 @@ def download_youtube_video(url, filename, audio_only=False):
     filename += filename_ext
 
     if os.path.exists(filename):
-        overwrite = get_user_input(f"File '{filename}' already exists. Do you want to overwrite it? (yes/no): ", 
+        overwrite = get_user_input(f"File '{filename}' already exists. Do you want to overwrite it? (yes/no): ",
                                    lambda x: x.lower() in ['yes', 'no'])
         if overwrite.lower() != 'yes':
             return
@@ -60,7 +65,7 @@ def download_youtube_video(url, filename, audio_only=False):
     try:
         stream.download(filename=filename)
     except Exception as e:
-        print(f"Error occurred during downloading: {type(e).__name__}, {str(e)}")
+        handle_error(e)
         return
 
     print(f"\nDownloaded as {filename}")
@@ -86,10 +91,16 @@ def main():
             url = get_user_input("Enter the YouTube URL: ", is_youtube_url)
             filename = get_user_input("Enter the filename for the downloaded content (without extension): ")
             audio_only = choice == '2'
-            
+
             download_youtube_video(url, filename, audio_only)
         elif choice == '3':
             break
 
+class TestYouPy(unittest.TestCase):
+
+    def test_is_youtube_url(self):
+        self.assertTrue(is_youtube_url('https://www.youtube.com/watch?v=dQw4w9WgXcQ'))
+        self.assertFalse(is_youtube_url('https://www.notarealwebsite.com/watch?v=dQw4w9WgXcQ'))
+
 if __name__ == "__main__":
-    main()  
+    unittest.main()

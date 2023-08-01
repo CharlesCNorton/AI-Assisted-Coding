@@ -1,35 +1,19 @@
+# Improved YouPy
 
-# Enhanced YouTube Downloader
-
-Welcome to the Enhanced YouTube Downloader, an efficient and reliable tool that takes your YouTube content offline in the most user-friendly way. With its new and improved features, it makes downloading videos or audio from YouTube a breeze!
+This script is an improved version of the original YouPy, a YouTube downloader. It allows users to download either the video or audio from a specified YouTube URL.
 
 ## Features
 
-- Download YouTube videos in the highest available resolution.
-- Download audio-only files from YouTube videos.
-- Informative download progress indicator.
-- Advanced error handling for robust functionality.
-- Improved user interface for a better user experience.
-- More modular code structure for easier maintenance and enhancement.
-- File overwrite protection with user preference settings.
-- Added unit tests to ensure functionality and facilitate future debugging or enhancements.
+1. Robust exception handling: If there's an issue with the URL, the user is prompted to enter another one, rather than the script merely printing an error message and proceeding to the next step.
+2. Improved modularity: The code has been broken down into smaller, more manageable functions, improving both readability and maintenance.
+3. Centralized user prompts: All user prompts are placed in a single dictionary for easier management and modification.
+4. Intelligent filename handling: If a file with the same name exists, the script automatically creates a new file with a suffix to avoid overwriting.
+5. Visually appealing progress bar: The script displays a progress bar during downloads, providing a more intuitive progress indicator to the user.
 
 ## Usage
 
-1. Run the Python script: `python YouPy_improved.py`
-2. Choose an option: download a video (press 1), download only audio (press 2), or exit (press 3).
-3. If you choose to download, you will be prompted to enter the YouTube URL and the filename (without extension) for the downloaded content.
-4. If the filename already exists in the directory, you will be asked if you want to overwrite it. Enter 'yes' or 'no'.
-5. The content will be downloaded to the current directory. You can check the progress in the console.
-6. To run the unittest, execute `python -m unittest YouPy_improved.py`
+Run the script in a Python environment with necessary libraries installed (pytube, os, re). Follow the prompts to download your desired YouTube content.
 
-## Requirements
+## Improvements
 
-- Python 3.x
-- Pytube library
-
-## Installation
-
-1. Clone the repository
-2. Install requirements using pip: `pip install -r requirements.txt`
-3. Run the script: `python YouPy_improved.py`
+The improvements were made by an AI model from OpenAI, demonstrating the potential of artificial intelligence in enhancing and iterating complex tasks.

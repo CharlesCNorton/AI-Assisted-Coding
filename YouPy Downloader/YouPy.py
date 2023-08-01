@@ -3,35 +3,44 @@ from pytube import YouTube, Playlist
 from pytube.exceptions import PytubeError
 import os
 import re
-import unittest
 
-def get_user_input(prompt, validation_func=None, error_message="Invalid input. Please try again."):
+USER_PROMPTS = {
+    "main_menu": "\n1. Download a YouTube video\n2. Download audio from a YouTube video\n3. Exit\nChoose an option: ",
+    "filename": "Enter the filename for the downloaded content (without extension): ",
+    "youtube_url": "Enter the YouTube URL: "
+}
+
+def get_user_input(prompt, validation_func=None):
     while True:
         value = input(prompt)
         if validation_func is None or validation_func(value):
             return value
-        print(error_message)
+        print("Invalid input. Please try again.")
 
 def progress_function(stream, chunk, bytes_remaining):
     total_size = stream.filesize
     bytes_downloaded = total_size - bytes_remaining
 
-    if total_size > 0:
-        percentage_of_completion = bytes_downloaded / total_size * 100
-        print(f"\rDownloading... {percentage_of_completion:.2f}%", end='')
-    else:
-        print(f"\rDownloading... completed", end='')
+    progress = (bytes_downloaded / total_size) * 100  # Progress in percentage
+    filled_len = int(progress) // 2  # Assuming the total length of progress bar is 50
+    bar = '█' * filled_len + '-' * (50 - filled_len)
+    print(f'\rDownloading: |{bar}| {progress:.2f}%', end='')
 
-def handle_error(e):
-    print(f"An error occurred: {type(e).__name__}, {str(e)}")
+def get_youtube_object():
+    while True:
+        url = input(USER_PROMPTS["youtube_url"])
+        if not is_youtube_url(url):
+            print("Invalid YouTube URL. Please try again.")
+            continue
 
-def get_youtube_object(url):
-    try:
-        return YouTube(url, on_progress_callback=progress_function)
-    except PytubeError as e:
-        handle_error(e)
-    except Exception as e:
-        handle_error(e)
+        try:
+            return YouTube(url, on_progress_callback=progress_function)
+        except PytubeError as e:
+            print(f"Pytube error occurred: {type(e).__name__}, {str(e)}")
+            print("Please try another URL.")
+        except Exception as e:
+            print(f"An error occurred: {type(e).__name__}, {str(e)}")
+            print("Please try another URL.")
 
 def get_youtube_stream(yt, audio_only):
     if audio_only:
@@ -44,30 +53,21 @@ def get_youtube_stream(yt, audio_only):
         print(f"No suitable stream found for {'audio only' if audio_only else 'video'}.")
     return stream, filename_ext
 
-def download_youtube_video(url, filename, audio_only=False):
-    yt = get_youtube_object(url)
-    if yt is None:
-        return
+def get_filename(filename, filename_ext):
+    base_filename = filename
+    counter = 1
+    while os.path.exists(filename + filename_ext):
+        filename = f"{base_filename}({counter})"
+        counter += 1
+    return filename + filename_ext
 
-    stream, filename_ext = get_youtube_stream(yt, audio_only)
-    if stream is None:
-        return
-
-    filename += filename_ext
-
-    if os.path.exists(filename):
-        overwrite = get_user_input(f"File '{filename}' already exists. Do you want to overwrite it? (yes/no): ",
-                                   lambda x: x.lower() in ['yes', 'no'])
-        if overwrite.lower() != 'yes':
-            return
-
+def download_stream(yt, stream, filename):
     print(f"\nDownloading: {yt.title}")
     try:
         stream.download(filename=filename)
     except Exception as e:
-        handle_error(e)
+        print(f"Error occurred during downloading: {type(e).__name__}, {str(e)}")
         return
-
     print(f"\nDownloaded as {filename}")
 
 def is_youtube_url(url):
@@ -80,27 +80,30 @@ def is_youtube_url(url):
     youtube_regex_match = re.match(youtube_regex, url)
     return youtube_regex_match is not None
 
+def download_youtube_video(filename, audio_only=False):
+    yt = get_youtube_object()
+    if yt is None:
+        return
+
+    stream, filename_ext = get_youtube_stream(yt, audio_only)
+    if stream is None:
+        return
+
+    filename = get_filename(filename, filename_ext)
+
+    download_stream(yt, stream, filename)
+
 def main():
     while True:
-        print("\n1. Download a YouTube video")
-        print("2. Download audio from a YouTube video")
-        print("3. Exit")
-        choice = get_user_input("Choose an option: ", lambda x: x in ['1', '2', '3'])
+        choice = get_user_input(USER_PROMPTS["main_menu"], lambda x: x in ['1', '2', '3'])
 
         if choice in ['1', '2']:
-            url = get_user_input("Enter the YouTube URL: ", is_youtube_url)
-            filename = get_user_input("Enter the filename for the downloaded content (without extension): ")
+            filename = get_user_input(USER_PROMPTS["filename"])
             audio_only = choice == '2'
-
-            download_youtube_video(url, filename, audio_only)
+            
+            download_youtube_video(filename, audio_only)
         elif choice == '3':
             break
 
-class TestYouPy(unittest.TestCase):
-
-    def test_is_youtube_url(self):
-        self.assertTrue(is_youtube_url('https://www.youtube.com/watch?v=dQw4w9WgXcQ'))
-        self.assertFalse(is_youtube_url('https://www.notarealwebsite.com/watch?v=dQw4w9WgXcQ'))
-
 if __name__ == "__main__":
-    unittest.main()
+    main()

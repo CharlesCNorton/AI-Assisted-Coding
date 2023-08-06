@@ -4,6 +4,9 @@ import os
 import traceback
 from datetime import datetime
 
+from colorama import init, Fore, Back, Style
+init(autoreset=True)
+
 MODEL_MAP = {
     "1": "facebook/musicgen-small",
     "2": "facebook/musicgen-medium",
@@ -21,7 +24,7 @@ def generate_music(model_name):
 
                 # Check if the text input is valid
         if not text.strip() or len(text) > 1000:
-            print("Text input was empty or too long. Please try again with valid text (up to 1000 characters).")
+            print(Fore.RED + "Text input was empty or too long. Please try again with valid text (up to 1000 characters).")
             return
 
                 # Load the processor
@@ -68,12 +71,12 @@ def generate_music(model_name):
 def main():
     while True:
                 # Print the menu
-        print("\nWelcome to MusicGen!")
-        print("Please choose a model for music generation:")
-        print("1. Small model (Fastest, but lowest quality)")
-        print("2. Medium model (Moderate speed and quality)")
-        print("3. Large model (Slowest, but highest quality)")
-        print("4. Exit (End the program)")
+        print(Fore.BLUE + "# Welcome to the Facebook Music Generator!")
+        print(Fore.GREEN + "# Please select a model:")
+        print(Fore.YELLOW + "# 1: Small Model")
+        print(Fore.YELLOW + "# 2: Medium Model")
+        print(Fore.YELLOW + "# 3: Large Model")
+        print(Fore.RED + "# q: Quit")
                 # Get the menu choice input from the user
         user_input = input("Enter your choice (1-4): ").strip()
 

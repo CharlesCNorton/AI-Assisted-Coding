@@ -17,12 +17,21 @@ WHITE, BLACK = (255, 255, 255), (0, 0, 0)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 PADDLE_SPEED = 5
-BALL_SPEED = [2, -2]
+BALL_SPEED = [2, -2]  # will be updated based on difficulty level
+
+# Constants for difficulty levels
+EASY, MEDIUM, HARD = 1, 2, 3
+DIFFICULTY_LEVELS = {
+    EASY: [2, -2],
+    MEDIUM: [3, -3],
+    HARD: [4, -4],
+}
+
 
 def generate_bonk_sound():
     # Sample rate and time
     sample_rate = 44100
-    duration = 0.05
+    duration = 0.1
 
     # Frequency for 'bonk' sound
     freq = 440.0
@@ -100,13 +109,16 @@ class Brick(pygame.Rect):
         self.color = WHITE  # default color
 
 class Game:
-    def __init__(self):
+    def __init__(self, difficulty=EASY):
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         self.clock = pygame.time.Clock()
         self.font = pygame.font.Font(None, 36)
         self.score = 0
         self.paddle = Paddle(WIDTH // 2 - PADDLE_WIDTH // 2, HEIGHT - 50, PADDLE_WIDTH, PADDLE_HEIGHT)
         self.ball = Ball(WIDTH // 2 - BALL_RADIUS // 2, HEIGHT // 2 - BALL_RADIUS // 2, BALL_RADIUS * 2, BALL_RADIUS * 2)
+        self.difficulty = difficulty
+        self.paused = False
+        self.set_difficulty(difficulty)
 
         # Initialize bricks
         self.bricks = []
@@ -132,8 +144,17 @@ class Game:
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_p:  # Pause functionality
+                    self.paused = not self.paused
+                elif event.key in (pygame.K_1, pygame.K_2, pygame.K_3):  # Difficulty settings
+                    self.set_difficulty(int(event.unicode))
+
 
     def update_game(self):
+        if self.paused:  # Skip update if paused
+            return
+
         self.paddle.move_paddle(PADDLE_SPEED)
         self.ball.move_ball(BALL_SPEED)
 
@@ -153,45 +174,53 @@ class Game:
                 bonk_sound.play()
                 break
 
-        if self.ball.bottom > HEIGHT:
-            self.end_game("Game Over!")
-
-        if not self.bricks:
-            self.end_game("You Win!")
-
-
-    def end_game(self, text):
-        self.render_text(text, (WIDTH // 2 - 80, HEIGHT // 2 - 20))
-        pygame.display.flip()
-        pygame.time.delay(3000)
-        sys.exit()
+        if self.ball.top > HEIGHT:  # Ball fell out
+            self.restart()
 
     def render_objects(self):
         self.screen.fill(BLACK)
         pygame.draw.rect(self.screen, WHITE, self.paddle)
-        pygame.draw.circle(self.screen, WHITE, (self.ball.x + BALL_RADIUS, self.ball.y + BALL_RADIUS), BALL_RADIUS)
+        pygame.draw.ellipse(self.screen, WHITE, self.ball)
         for brick in self.bricks:
             pygame.draw.rect(self.screen, brick.color, brick)
+        self.render_text(f"Score: {self.score}", (20, 10))
 
-        self.render_text(f"Score: {self.score}", (10, 10))
+        if self.paused:
+            self.render_text("PAUSED", (WIDTH // 2 - 80, HEIGHT // 2 - 20))
 
     def render_text(self, text, position):
-        text_surface = self.font.render(text, True, WHITE)
-        self.screen.blit(text_surface, position)
+        label = self.font.render(text, True, WHITE)
+        self.screen.blit(label, position)
+
+    def restart(self):
+        self.__init__(self.difficulty)
+        self.run()
 
     def show_menu(self):
         while True:
             self.screen.fill(BLACK)
             self.render_text("Brick Breaker", (WIDTH // 2 - 80, HEIGHT // 3))
             self.render_text("Press SPACE to start", (WIDTH // 2 - 120, HEIGHT // 2))
+            self.render_text("1: Easy 2: Medium 3: Hard", (WIDTH // 2 - 80, HEIGHT * 2 // 3))
             pygame.display.flip()
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-                    return  # start the game
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_SPACE:
+                        return  # start the game
+                    elif event.key == pygame.K_1:
+                        self.set_difficulty(EASY)
+                    elif event.key == pygame.K_2:
+                        self.set_difficulty(MEDIUM)
+                    elif event.key == pygame.K_3:
+                        self.set_difficulty(HARD)
+
+    def set_difficulty(self, level):
+        global BALL_SPEED
+        BALL_SPEED = list(DIFFICULTY_LEVELS[level])
 
 if __name__ == "__main__":
     game = Game()

@@ -1,34 +1,30 @@
-
-from pytube import YouTube, Playlist
+from pytube import YouTube
 from pytube.exceptions import PytubeError
 import os
 import re
-
-USER_PROMPTS = {
-    "main_menu": "\n1. Download a YouTube video\n2. Download audio from a YouTube video\n3. Exit\nChoose an option: ",
-    "filename": "Enter the filename for the downloaded content (without extension): ",
-    "youtube_url": "Enter the YouTube URL: "
-}
-
-def get_user_input(prompt, validation_func=None):
-    while True:
-        value = input(prompt)
-        if validation_func is None or validation_func(value):
-            return value
-        print("Invalid input. Please try again.")
 
 def progress_function(stream, chunk, bytes_remaining):
     total_size = stream.filesize
     bytes_downloaded = total_size - bytes_remaining
 
     progress = (bytes_downloaded / total_size) * 100  # Progress in percentage
-    filled_len = int(progress) // 2  # Assuming the total length of progress bar is 50
+    filled_len = int(progress) // 2  # Assuming the total length of the progress bar is 50
     bar = '█' * filled_len + '-' * (50 - filled_len)
     print(f'\rDownloading: |{bar}| {progress:.2f}%', end='')
 
+def is_youtube_url(url):
+    youtube_regex = (
+        r'(https?://)?(www\.)?'
+        '(youtube|youtu|youtube-nocookie)\.(com|be)/'
+        '(watch\?v=|embed/|v/|.+\?v=)?([^&=%\?]{11})'
+    )
+
+    youtube_regex_match = re.match(youtube_regex, url)
+    return youtube_regex_match is not None
+
 def get_youtube_object():
     while True:
-        url = input(USER_PROMPTS["youtube_url"])
+        url = input("Enter the YouTube URL: ")
         if not is_youtube_url(url):
             print("Invalid YouTube URL. Please try again.")
             continue
@@ -70,40 +66,38 @@ def download_stream(yt, stream, filename):
         return
     print(f"\nDownloaded as {filename}")
 
-def is_youtube_url(url):
-    youtube_regex = (
-        r'(https?://)?(www\.)?'
-        '(youtube|youtu|youtube-nocookie)\.(com|be)/'
-        '(watch\?v=|embed/|v/|.+\?v=)?([^&=%\?]{11})'
-    )
-
-    youtube_regex_match = re.match(youtube_regex, url)
-    return youtube_regex_match is not None
-
 def download_youtube_video(filename, audio_only=False):
     yt = get_youtube_object()
     if yt is None:
+        print("YouTube object could not be retrieved. Exiting.")
         return
 
     stream, filename_ext = get_youtube_stream(yt, audio_only)
     if stream is None:
+        print("Stream could not be found. Exiting.")
         return
 
     filename = get_filename(filename, filename_ext)
-
     download_stream(yt, stream, filename)
+
+def get_user_choice():
+    print("\n1. Download a YouTube video")
+    print("2. Download audio from a YouTube video")
+    print("3. Exit")
+    return input("Choose an option: ")
 
 def main():
     while True:
-        choice = get_user_input(USER_PROMPTS["main_menu"], lambda x: x in ['1', '2', '3'])
+        choice = get_user_choice()
 
         if choice in ['1', '2']:
-            filename = get_user_input(USER_PROMPTS["filename"])
+            filename = input("Enter the filename for the downloaded content (without extension): ")
             audio_only = choice == '2'
-            
             download_youtube_video(filename, audio_only)
         elif choice == '3':
             break
+        else:
+            print("Invalid choice. Please try again.")
 
 if __name__ == "__main__":
     main()

@@ -28,17 +28,17 @@ def main() -> None:
     end = get_integer_input("Enter the end of the sequence: ")
     step = get_integer_input("Enter the step size: ")
 
-    sequence = generate_sequence(start, end, step)
-
     display_all = input("Do you want to display the numbers all at once (y/n)? ").lower()
 
     if display_all == "y":
-        print("The sequence of numbers is:", list(sequence))
+        print("The sequence of numbers is:", list(generate_sequence(start, end, step)))
     else:
-        for number in sequence:
-            print(number, end=" ")
+        for number in generate_sequence(start, end, step):
+            print(number, end=" ", flush=True)
             sleep(1)
         print()
+
+    input("Press Enter to exit...")
 
 if __name__ == "__main__":
     main()

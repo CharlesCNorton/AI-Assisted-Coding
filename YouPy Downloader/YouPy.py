@@ -1,103 +1,63 @@
-from pytube import YouTube
-from pytube.exceptions import PytubeError
+import yt_dlp
 import os
 import re
 
-def progress_function(stream, chunk, bytes_remaining):
-    total_size = stream.filesize
-    bytes_downloaded = total_size - bytes_remaining
+def validate_url(url):
+    # A basic regex to check if the URL seems like a valid YouTube URL
+    youtube_regex = re.compile(
+        r'^(https?://)?(www\.)?(youtube\.com|youtu\.?be)/.+$')
+    return youtube_regex.match(url)
 
-    progress = (bytes_downloaded / total_size) * 100  # Progress in percentage
-    filled_len = int(progress) // 2  # Assuming the total length of the progress bar is 50
-    bar = '█' * filled_len + '-' * (50 - filled_len)
-    print(f'\rDownloading: |{bar}| {progress:.2f}%', end='')
+def download_video_yt_dlp(url, output_path):
+    options = {
+        'format': 'bestvideo+bestaudio/best',
+        'outtmpl': f'{output_path}/%(title)s.%(ext)s',
+        'progress_hooks': [hook],
+    }
+    
+    with yt_dlp.YoutubeDL(options) as ydl:
+        ydl.download([url])
 
-def is_youtube_url(url):
-    youtube_regex = (
-        r'(https?://)?(www\.)?'
-        '(youtube|youtu|youtube-nocookie)\.(com|be)/'
-        '(watch\?v=|embed/|v/|.+\?v=)?([^&=%\?]{11})'
-    )
-
-    youtube_regex_match = re.match(youtube_regex, url)
-    return youtube_regex_match is not None
-
-def get_youtube_object():
-    while True:
-        url = input("Enter the YouTube URL: ")
-        if not is_youtube_url(url):
-            print("Invalid YouTube URL. Please try again.")
-            continue
-
-        try:
-            return YouTube(url, on_progress_callback=progress_function)
-        except PytubeError as e:
-            print(f"Pytube error occurred: {type(e).__name__}, {str(e)}")
-            print("Please try another URL.")
-        except Exception as e:
-            print(f"An error occurred: {type(e).__name__}, {str(e)}")
-            print("Please try another URL.")
-
-def get_youtube_stream(yt, audio_only):
-    if audio_only:
-        stream = yt.streams.filter(only_audio=True).first()
-        filename_ext = '.mp3'
-    else:
-        stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
-        filename_ext = '.mp4'
-    if stream is None:
-        print(f"No suitable stream found for {'audio only' if audio_only else 'video'}.")
-    return stream, filename_ext
-
-def get_filename(filename, filename_ext):
-    base_filename = filename
-    counter = 1
-    while os.path.exists(filename + filename_ext):
-        filename = f"{base_filename}({counter})"
-        counter += 1
-    return filename + filename_ext
-
-def download_stream(yt, stream, filename):
-    print(f"\nDownloading: {yt.title}")
-    try:
-        stream.download(filename=filename)
-    except Exception as e:
-        print(f"Error occurred during downloading: {type(e).__name__}, {str(e)}")
-        return
-    print(f"\nDownloaded as {filename}")
-
-def download_youtube_video(filename, audio_only=False):
-    yt = get_youtube_object()
-    if yt is None:
-        print("YouTube object could not be retrieved. Exiting.")
-        return
-
-    stream, filename_ext = get_youtube_stream(yt, audio_only)
-    if stream is None:
-        print("Stream could not be found. Exiting.")
-        return
-
-    filename = get_filename(filename, filename_ext)
-    download_stream(yt, stream, filename)
-
-def get_user_choice():
-    print("\n1. Download a YouTube video")
-    print("2. Download audio from a YouTube video")
-    print("3. Exit")
-    return input("Choose an option: ")
+def hook(d):
+    if d['status'] == 'downloading':
+        # Display the progress bar
+        print(d['_percent_str'], end="\r")
 
 def main():
     while True:
-        choice = get_user_choice()
+        # Prompt the user for the video URL
+        url = input("\nEnter the YouTube video URL: ").strip()
 
-        if choice in ['1', '2']:
-            filename = input("Enter the filename for the downloaded content (without extension): ")
-            audio_only = choice == '2'
-            download_youtube_video(filename, audio_only)
-        elif choice == '3':
+        # Validate the URL
+        if not validate_url(url):
+            print("Invalid YouTube URL. Please try again.")
+            continue
+
+        # Prompt the user for the desired output path
+        output_path = input("Enter the desired output path: ").strip()
+
+        # Check if the directory exists
+        if not os.path.exists(output_path):
+            choice = input(f"The directory '{output_path}' does not exist. Would you like to create it? (yes/no): ").strip().lower()
+            if choice == 'yes':
+                os.makedirs(output_path)
+            else:
+                print("Please provide a valid directory.")
+                continue
+
+        # Attempt to download the video
+        try:
+            download_video_yt_dlp(url, output_path)
+            print("\nVideo downloaded successfully!")
+        except Exception as e:
+            print(f"\nAn error occurred: {str(e)}")
+
+        # Ask the user if they want to download another video or exit
+        choice = input("\nDo you want to download another video? (yes/no): ").strip().lower()
+        if choice != 'yes':
+            print("\nGoodbye!")
             break
-        else:
-            print("Invalid choice. Please try again.")
 
 if __name__ == "__main__":
+    print("Welcome to YouPy!!")
     main()

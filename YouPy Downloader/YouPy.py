@@ -7,13 +7,12 @@ MAX_RETRIES = 3  # Max number of retries for a failed download
 def validate_url_using_yt_dlp(url):
     try:
         with yt_dlp.YoutubeDL() as ydl:
-            # Just try to extract the info, but don't download anything
             ydl.extract_info(url, download=False)
             return True
     except Exception:
         return False
 
-def download_video_yt_dlp(url, output_path, output_name=None):
+def download_video_yt_dlp(url, output_path, output_name=None, ffmpeg_path=None):
     outtmpl = f'{output_path}/'
     if output_name:
         outtmpl += f'{output_name}.%(ext)s'
@@ -30,6 +29,9 @@ def download_video_yt_dlp(url, output_path, output_name=None):
         'merge_output_format': 'mp4',
     }
     
+    if ffmpeg_path:
+        options['ffmpeg_location'] = ffmpeg_path
+
     with yt_dlp.YoutubeDL(options) as ydl:
         ydl.download([url])
 
@@ -43,19 +45,16 @@ def sanitize_filename(filename):
 def main():
     print("Welcome to YouPy!!")
     
+    # Get the FFmpeg path from the user
+    ffmpeg_path = input("Enter the path to your ffmpeg bin directory (e.g., C:/path/to/ffmpeg/bin): ").strip()
+    
     while True:
-        # Prompt the user for the video URL
         url = input("\nEnter the YouTube video URL: ").strip()
-
-        # Validate the URL
         if not validate_url_using_yt_dlp(url):
             print("Invalid YouTube URL or video might be restricted. Please try again.")
             continue
 
-        # Prompt the user for the desired output path
         output_path = input("Enter the desired output path: ").strip()
-
-        # Check if the directory exists
         if not os.path.exists(output_path):
             choice = input(f"The directory '{output_path}' does not exist. Would you like to create it? (yes/no): ").strip().lower()
             if choice == 'yes':
@@ -64,15 +63,13 @@ def main():
                 print("Please provide a valid directory.")
                 continue
 
-        # Ask the user for a custom output name (optional)
         output_name = input("Enter a name for the output file (Leave empty for the video's title): ").strip()
         output_name = sanitize_filename(output_name)
 
-        # Attempt to download the video
         retries = 0
         while retries < MAX_RETRIES:
             try:
-                download_video_yt_dlp(url, output_path, output_name)
+                download_video_yt_dlp(url, output_path, output_name, ffmpeg_path)
                 print("\nVideo downloaded successfully!")
                 break
             except Exception as e:
@@ -85,7 +82,6 @@ def main():
                 else:
                     print("Max retries reached. Moving on.")
 
-        # Ask the user if they want to download another video or exit
         choice = input("\nDo you want to download another video? (yes/no): ").strip().lower()
         if choice != 'yes':
             print("\nGoodbye!")

@@ -6,22 +6,34 @@ API_KEY = "YOUR_API_KEY"  # Remember to add your API key here before executing
 DEFAULT_DIR = "./"  # Set current directory as the default directory
 
 def get_voices():
-    headers = {
-        "xi-api-key": API_KEY
-    }
+    """Fetch available voices from the ElevenLabs API."""
+    headers = {"xi-api-key": API_KEY}
     response = requests.get(f"{BASE_URL}/voices", headers=headers)
+    
     if response.status_code == 200:
         return response.json()["voices"]
     else:
         raise Exception(f"Error fetching voices: {response.status_code} - {response.text}")
 
 def display_voices():
+    """Display the available voices and return the list of voices."""
     voices = get_voices()
     for index, voice in enumerate(voices, 1):
         print(f"{index}. {voice['name']} ({voice['voice_id']})")
     return voices
 
+def set_voice(voices):
+    """Prompt the user to select a voice and return the selected voice."""
+    selected = int(input("\nSelect a voice number or 0 to return to main menu: "))
+    
+    if 0 < selected <= len(voices):
+        return voices[selected-1]
+    elif selected != 0:
+        print("\nInvalid voice number.")
+        return None
+
 def text_to_speech(text, voice_id):
+    """Convert given text to speech using a specified voice."""
     headers = {
         "xi-api-key": API_KEY,
         "Content-Type": "application/json"
@@ -44,11 +56,10 @@ def text_to_speech(text, voice_id):
     handle_response(response)
 
 def handle_response(response):
+    """Save audio response to a file or display error message."""
     try:
         if response.status_code == 200:
-            filename = input("Enter a filename for the audio output (e.g., myaudio.mp3): ")
-            if not filename.strip():
-                filename = "output.mp3"
+            filename = input("Enter a filename for the audio output (e.g., myaudio.mp3): ") or "output.mp3"
             full_path = os.path.join(DEFAULT_DIR, filename)
             with open(full_path, 'wb') as audio_file:
                 audio_file.write(response.content)
@@ -62,10 +73,12 @@ def handle_response(response):
         print(f"Unexpected error: {e}")
 
 def main():
+    """Main driver function."""
     global DEFAULT_DIR
 
     print("Welcome to ElevenLabs VoiceGen!")
     print("="*30)
+    selected_voice = None
 
     while True:
         print("\n=== Menu ===")
@@ -73,22 +86,17 @@ def main():
         print("2. Convert Text to Speech")
         print("3. Set Default Output Directory")
         print("4. Exit")
-
         choice = input("\nYour choice: ")
 
         if choice == "1":
             voices = display_voices()
-            selected = int(input("\nSelect a voice number or 0 to return to main menu: "))
-            if 0 < selected <= len(voices):
-                selected_voice = voices[selected-1]
+            selected_voice = set_voice(voices)
+            if selected_voice:
                 print(f"\nYou've selected: {selected_voice['name']} ({selected_voice['voice_id']})")
-            elif selected != 0:
-                print("\nInvalid voice number.")
         elif choice == "2":
             text = input("\nEnter the text you want to convert to speech: ")
-            voice_id = input("Enter the voice ID (or leave empty to use a previously selected voice if any): ")
-            if not voice_id and 'selected_voice' in locals():
-                voice_id = selected_voice['voice_id']
+            voice_id = input("Enter the voice ID (or leave empty to use a previously selected voice if any): ") or (selected_voice and selected_voice['voice_id'])
+
             if not voice_id:
                 print("\nPlease provide a voice ID or select a voice first.")
                 continue

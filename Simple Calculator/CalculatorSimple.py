@@ -1,11 +1,16 @@
 import tkinter as tk
 import math
-import re
 import ast
 import operator
 
-# Dictionary of supported operators
-OPERATORS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv, ast.USub: operator.neg, ast.Pow: operator.pow}
+OPERATORS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.USub: operator.neg,
+    ast.Pow: operator.pow
+}
 
 class ToolTip:
     def __init__(self, widget, text):
@@ -15,8 +20,7 @@ class ToolTip:
         self.widget.bind("<Enter>", self.show_tooltip)
         self.widget.bind("<Leave>", self.hide_tooltip)
 
-    def show_tooltip(self, event=None):
-        x = y = 0
+    def show_tooltip(self, _=None):
         x, y, _, _ = self.widget.bbox("insert")
         x += self.widget.winfo_rootx() + 25
         y += self.widget.winfo_rooty() + 20
@@ -26,7 +30,7 @@ class ToolTip:
         label = tk.Label(self.tooltip_window, text=self.text, background="#ffffff")
         label.pack()
 
-    def hide_tooltip(self, event=None):
+    def hide_tooltip(self, _=None):
         if self.tooltip_window:
             self.tooltip_window.destroy()
             self.tooltip_window = None
@@ -34,39 +38,33 @@ class ToolTip:
 class Calculator:
     def __init__(self):
         self.constants = {
-            'pi': 'math.pi',
-            'e': 'math.e',
-            'g': '9.81',  # acceleration due to gravity
-            'c': '299792458',  # speed of light in m/s
-            'h': '6.62607015e-34'  # Planck's constant in m^2 kg / s
+            'pi': math.pi,
+            'e': math.e,
+            'g': 9.81,
+            'c': 299792458,
+            'h': 6.62607015e-34
         }
         self.functions = {
-            'sqrt': 'math.sqrt',
-            'log': 'math.log',
-            'sin': 'math.sin',
-            'cos': 'math.cos'
-        }
-        self.tooltips = {
-            'pi': 'Pi is a mathematical constant whose value is the ratio of any circle\'s circumference to its diameter.',
-            'e': 'Euler\'s number (e) is the base of the natural logarithm.',
-            'g': 'The acceleration due to gravity on Earth.',
-            'c': 'The speed of light in vacuum.',
-            'h': 'Planck\'s constant, used in quantum mechanics.',
-            'sqrt': 'Square root function. sqrt(x) returns the square root of x.',
-            'log': 'Natural logarithm function. log(x) returns the natural logarithm of x.',
-            'sin': 'Sine function. sin(x) returns the sine of x (x is in radians).',
-            'cos': 'Cosine function. cos(x) returns the cosine of x (x is in radians).'
+            'sqrt': math.sqrt,
+            'log': math.log,
+            'sin': math.sin,
+            'cos': math.cos
         }
 
     def eval_expr(self, expr):
+        # Substitute the function names and constants
+        for func in self.functions:
+            expr = expr.replace(func, f"math.{func}")
+        for const in self.constants:
+            expr = expr.replace(const, str(self.constants[const]))
         return self._eval(ast.parse(expr, mode='eval').body)
 
     def _eval(self, node):
-        if isinstance(node, ast.Num):  # <number>
+        if isinstance(node, ast.Num):
             return node.n
-        elif isinstance(node, ast.BinOp):  # <left> <operator> <right>
+        elif isinstance(node, ast.BinOp):
             return OPERATORS[type(node.op)](self._eval(node.left), self._eval(node.right))
-        elif isinstance(node, ast.UnaryOp):  # <operator> <operand> e.g., -1
+        elif isinstance(node, ast.UnaryOp):
             return OPERATORS[type(node.op)](self._eval(node.operand))
         else:
             raise TypeError(node)
@@ -78,6 +76,7 @@ class CalculatorGUI:
         self.window.title('Calculator')
         self.entry = tk.Entry(self.window, width=35, font=('Arial', 14))
         self.entry.grid(row=0, column=0, columnspan=5, padx=10, pady=10)
+        
         buttons = [
             ['7', '8', '9', '/', 'sqrt', '(', ')'],
             ['4', '5', '6', '*', 'log', 'pi', 'e'],
@@ -85,15 +84,27 @@ class CalculatorGUI:
             ['0', '.', '=', '+', 'cos', 'h', 'g'],
             ['Clear', '', '', '', '', '', '']
         ]
+
+        tooltips = {
+            'pi': 'Pi - Mathematical constant',
+            'e': 'Euler\'s number',
+            'g': 'Acceleration due to gravity',
+            'c': 'Speed of light',
+            'h': 'Planck\'s constant',
+            'sqrt': 'Square root',
+            'log': 'Natural logarithm',
+            'sin': 'Sine function',
+            'cos': 'Cosine function'
+        }
+
         for i, row in enumerate(buttons):
             for j, button in enumerate(row):
-                if button != '':
-                    if button in self.calculator.constants or button in self.calculator.functions:
-                        btn = tk.Button(self.window, text=button, width=5, height=2, font=('Arial', 12), command=lambda x=button: self.handle_button_click(self.calculator.constants.get(x, self.calculator.functions.get(x, x))))
-                        ToolTip(btn, self.calculator.tooltips.get(button, ""))
-                    else:
-                        btn = tk.Button(self.window, text=button, width=5, height=2, font=('Arial', 12), command=lambda x=button: self.handle_button_click(x))
+                if button:
+                    btn = tk.Button(self.window, text=button, width=5, height=2, font=('Arial', 12))
+                    btn['command'] = lambda x=button: self.handle_button_click(x)
                     btn.grid(row=i+1, column=j, padx=5, pady=5)
+                    if button in tooltips:
+                        ToolTip(btn, tooltips[button])
 
     def handle_button_click(self, button):
         if button == '=':
@@ -107,29 +118,22 @@ class CalculatorGUI:
 
     def equals(self):
         expression = self.entry.get().strip()
-        if expression == '':
-            self.entry.delete(0, 'end')
-            self.entry.insert('end', 'Error: Empty input')
-        elif self.validate_expression(expression):
+        if not expression:
+            self.show_error('Empty input')
+        else:
             try:
                 result = str(self.calculator.eval_expr(expression))
                 self.entry.delete(0, 'end')
                 self.entry.insert('end', result)
-            except ZeroDivisionError:
-                self.entry.delete(0, 'end')
-                self.entry.insert('end', 'Error: Division by zero')
             except Exception as e:
-                self.entry.delete(0, 'end')
-                self.entry.insert('end', 'Error: ' + str(e))
-        else:
-            self.entry.delete(0, 'end')
-            self.entry.insert('end', 'Invalid input')
+                self.show_error(str(e))
 
     def clear(self):
         self.entry.delete(0, 'end')
 
-    def validate_expression(self, expression):
-        return all(char.isnumeric() or char.isspace() or char in '().+-*/^' for char in expression)
+    def show_error(self, message):
+        self.entry.delete(0, 'end')
+        self.entry.insert('end', f'Error: {message}')
 
     def run(self):
         self.window.mainloop()

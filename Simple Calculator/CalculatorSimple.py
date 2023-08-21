@@ -53,6 +53,7 @@ class Calculator:
 
     def eval_expr(self, expr):
         # Substitute the function names and constants
+        expr = expr.replace('^', '**')
         for func in self.functions:
             expr = expr.replace(func, f"math.{func}")
         for const in self.constants:
@@ -76,7 +77,7 @@ class CalculatorGUI:
         self.window.title('Calculator')
         self.entry = tk.Entry(self.window, width=35, font=('Arial', 14))
         self.entry.grid(row=0, column=0, columnspan=5, padx=10, pady=10)
-        
+
         buttons = [
             ['7', '8', '9', '/', 'sqrt', '(', ')'],
             ['4', '5', '6', '*', 'log', 'pi', 'e'],
@@ -100,8 +101,7 @@ class CalculatorGUI:
         for i, row in enumerate(buttons):
             for j, button in enumerate(row):
                 if button:
-                    btn = tk.Button(self.window, text=button, width=5, height=2, font=('Arial', 12))
-                    btn['command'] = lambda x=button: self.handle_button_click(x)
+                    btn = tk.Button(self.window, text=button, width=5, height=2, font=('Arial', 12), command=lambda x=button: self.handle_button_click(x))
                     btn.grid(row=i+1, column=j, padx=5, pady=5)
                     if button in tooltips:
                         ToolTip(btn, tooltips[button])

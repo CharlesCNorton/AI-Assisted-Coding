@@ -12,6 +12,14 @@ OPERATORS = {
     ast.Pow: operator.pow
 }
 
+ALLOWED_NODES = {
+    ast.Expression,
+    ast.BinOp,
+    ast.UnaryOp,
+    ast.Constant,
+    ast.Name
+}
+
 class ToolTip:
     def __init__(self, widget, text):
         self.widget = widget
@@ -52,7 +60,6 @@ class Calculator:
         }
 
     def eval_expr(self, expr):
-        # Substitute the function names and constants
         expr = expr.replace('^', '**')
         for func in self.functions:
             expr = expr.replace(func, f"math.{func}")
@@ -61,8 +68,11 @@ class Calculator:
         return self._eval(ast.parse(expr, mode='eval').body)
 
     def _eval(self, node):
-        if isinstance(node, ast.Num):
-            return node.n
+        if type(node) not in ALLOWED_NODES:
+            raise TypeError(f"Unsupported type: {type(node)}")
+        
+        if isinstance(node, ast.Constant):
+            return node.value
         elif isinstance(node, ast.BinOp):
             return OPERATORS[type(node.op)](self._eval(node.left), self._eval(node.right))
         elif isinstance(node, ast.UnaryOp):
@@ -88,10 +98,10 @@ class CalculatorGUI:
 
         tooltips = {
             'pi': 'Pi - Mathematical constant',
-            'e': 'Euler\'s number',
+            'e': "Euler's number",
             'g': 'Acceleration due to gravity',
             'c': 'Speed of light',
-            'h': 'Planck\'s constant',
+            'h': "Planck's constant",
             'sqrt': 'Square root',
             'log': 'Natural logarithm',
             'sin': 'Sine function',
@@ -99,12 +109,16 @@ class CalculatorGUI:
         }
 
         for i, row in enumerate(buttons):
-            for j, button in enumerate(row):
-                if button:
-                    btn = tk.Button(self.window, text=button, width=5, height=2, font=('Arial', 12), command=lambda x=button: self.handle_button_click(x))
-                    btn.grid(row=i+1, column=j, padx=5, pady=5)
-                    if button in tooltips:
-                        ToolTip(btn, tooltips[button])
+            self.create_buttons(i, row, tooltips)
+
+    def create_buttons(self, i, row, tooltips):
+        for j, button in enumerate(row):
+            if button:
+                btn = tk.Button(self.window, text=button, width=5, height=2, font=('Arial', 12),
+                                command=lambda x=button: self.handle_button_click(x))
+                btn.grid(row=i+1, column=j, padx=5, pady=5)
+                if button in tooltips:
+                    ToolTip(btn, tooltips[button])
 
     def handle_button_click(self, button):
         if button == '=':

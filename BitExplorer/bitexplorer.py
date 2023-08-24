@@ -18,6 +18,26 @@ def pretty_print(data):
 
 def get_block_overview():
     block_height = input("Enter block height (or 'latest' for the latest block): ")
+
+    if block_height == 'latest':
+        # Fetch the current block height first
+        try:
+            response = requests.get(API_URL)
+            response.raise_for_status()
+            data = response.json()
+            block_height = data["height"] # Assuming 'height' is the correct key for block height in the returned data
+        except requests.exceptions.HTTPError as errh:
+            console.print(f"HTTP Error: {errh}")
+            return
+        except requests.exceptions.ConnectionError as errc:
+            console.print(f"Error Connecting: {errc}")
+            return
+        except requests.exceptions.Timeout as errt:
+            console.print(f"Timeout Error: {errt}")
+            return
+        except requests.exceptions.RequestException as err:
+            console.print(f"Something went wrong: {err}")
+            return
     try:
         response = requests.get(f"{API_URL}/blocks/{block_height}")
         response.raise_for_status()
@@ -30,6 +50,7 @@ def get_block_overview():
         console.print(f"Timeout Error: {errt}")
     except requests.exceptions.RequestException as err:
         console.print(f"Something went wrong: {err}")
+
 
 def get_transaction_overview():
     tx_hash = input("Enter transaction hash: ")

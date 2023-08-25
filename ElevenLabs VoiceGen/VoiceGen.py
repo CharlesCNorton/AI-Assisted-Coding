@@ -4,16 +4,23 @@ import os
 BASE_URL = "https://api.elevenlabs.io/v1"
 API_KEY = "YOUR_API_KEY"  # Remember to add your API key here before executing
 DEFAULT_DIR = "./"  # Set current directory as the default directory
+MAX_RETRIES = 3
+
+def fetch_from_api(endpoint):
+    """Retry fetching data from API in case of network issues."""
+    for i in range(MAX_RETRIES):
+        headers = {"xi-api-key": API_KEY}
+        response = requests.get(f"{BASE_URL}{endpoint}", headers=headers)
+
+        if response.status_code == 200:
+            return response.json()
+        elif response.status_code == 401:
+            raise Exception("Invalid API key!")
+    raise Exception(f"Error fetching from API after {MAX_RETRIES} attempts: {response.status_code} - {response.text}")
 
 def get_voices():
     """Fetch available voices from the ElevenLabs API."""
-    headers = {"xi-api-key": API_KEY}
-    response = requests.get(f"{BASE_URL}/voices", headers=headers)
-    
-    if response.status_code == 200:
-        return response.json()["voices"]
-    else:
-        raise Exception(f"Error fetching voices: {response.status_code} - {response.text}")
+    return fetch_from_api("/voices")["voices"]
 
 def display_voices():
     """Display the available voices and return the list of voices."""
@@ -24,13 +31,17 @@ def display_voices():
 
 def set_voice(voices):
     """Prompt the user to select a voice and return the selected voice."""
-    selected = int(input("\nSelect a voice number or 0 to return to main menu: "))
-    
-    if 0 < selected <= len(voices):
-        return voices[selected-1]
-    elif selected != 0:
-        print("\nInvalid voice number.")
-        return None
+    while True:
+        try:
+            selected = int(input("\nSelect a voice number or 0 to return to main menu: "))
+            if 0 < selected <= len(voices):
+                return voices[selected - 1]
+            elif selected == 0:
+                return None
+            else:
+                print("\nInvalid voice number.")
+        except ValueError:
+            print("\nInvalid input. Please enter a valid number.")
 
 def text_to_speech(text, voice_id):
     """Convert given text to speech using a specified voice."""
@@ -77,7 +88,7 @@ def main():
     global DEFAULT_DIR
 
     print("Welcome to ElevenLabs VoiceGen!")
-    print("="*30)
+    print("=" * 30)
     selected_voice = None
 
     while True:
@@ -95,11 +106,16 @@ def main():
                 print(f"\nYou've selected: {selected_voice['name']} ({selected_voice['voice_id']})")
         elif choice == "2":
             text = input("\nEnter the text you want to convert to speech: ")
-            voice_id = input("Enter the voice ID (or leave empty to use a previously selected voice if any): ") or (selected_voice and selected_voice['voice_id'])
+            if not text.strip():
+                print("\nPlease provide some text.")
+                continue
 
+            voice_id = input("Enter the voice ID (or leave empty to use a previously selected voice if any): ") or (selected_voice and selected_voice['voice_id'])
+            
             if not voice_id:
                 print("\nPlease provide a voice ID or select a voice first.")
                 continue
+
             text_to_speech(text, voice_id)
         elif choice == "3":
             dir_path = input("\nEnter the path for the default output directory (e.g., ./outputs/): ")

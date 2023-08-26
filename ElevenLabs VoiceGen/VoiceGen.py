@@ -1,10 +1,16 @@
 import requests
 import os
+import re
 
 BASE_URL = "https://api.elevenlabs.io/v1"
 API_KEY = "YOUR_API_KEY"  # Remember to add your API key here before executing
 DEFAULT_DIR = "./"  # Set current directory as the default directory
 MAX_RETRIES = 3
+
+def sanitize_filename(filename):
+    """Sanitize the filename to remove unwanted characters."""
+    sanitized_name = re.sub(r'[^a-zA-Z0-9_\-]', '', filename)
+    return sanitized_name or "output.mp3"
 
 def fetch_from_api(endpoint):
     """Retry fetching data from API in case of network issues."""
@@ -70,7 +76,8 @@ def handle_response(response):
     """Save audio response to a file or display error message."""
     try:
         if response.status_code == 200:
-            filename = input("Enter a filename for the audio output (e.g., myaudio.mp3): ") or "output.mp3"
+            filename = input("Enter a filename for the audio output (without extension, e.g., myaudio): ")
+            filename = sanitize_filename(filename) + ".mp3"
             full_path = os.path.join(DEFAULT_DIR, filename)
             with open(full_path, 'wb') as audio_file:
                 audio_file.write(response.content)

@@ -55,6 +55,73 @@ TOOLTIPS = {
     "warmup_steps": "Number of warmup steps for adaptive learning rate. Suggested range: 0-5000. Helps in stabilizing training in the beginning."
 }
 
+from transformers import DataCollatorForLanguageModeling
+
+def load_model_and_tokenizer(model_path):
+    """Load a pre-trained model and tokenizer from Hugging Face's model hub."""
+    model = AutoModelForCausalLM.from_pretrained(model_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    return model, tokenizer
+
+def prepare_training_data(train_file_path, tokenizer):
+    """Prepare the training data by tokenizing the text."""
+    train_dataset = TextDataset(
+        tokenizer=tokenizer,
+        file_path=train_file_path,
+        block_size=128
+    )
+    return train_dataset
+
+def configure_training(config):
+    """Set up the training configuration."""
+    training_args = TrainingArguments(
+        output_dir=config.output_dir,
+        overwrite_output_dir=True,
+        num_train_epochs=config.num_train_epochs,
+        per_device_train_batch_size=config.per_device_train_batch_size,
+        learning_rate=config.learning_rate,
+        weight_decay=0.01,
+        logging_dir='./logs',
+        logging_steps=10,
+        save_steps=10,
+        save_total_limit=2,
+        fp16=config.use_fp16,
+        gradient_accumulation_steps=1,
+        gradient_clipping=config.gradient_clipping,
+        evaluation_strategy="steps",
+        eval_steps=10,
+        warmup_steps=config.warmup_steps,
+        logging_first_step=True
+    )
+
+    scheduler = get_constant_schedule_with_warmup if config.use_adaptive_lr else None
+    return training_args, scheduler
+
+def perform_training(model, tokenizer, train_data, training_args, scheduler):
+    """Perform the actual fine-tuning."""
+    data_collator = DataCollatorForLanguageModeling(
+        tokenizer=tokenizer,
+        mlm=False
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        data_collator=data_collator,
+        train_dataset=train_data
+    )
+
+    trainer.train()
+    trainer.save_model()
+
+    return model, tokenizer
+
+def view_config(config):
+    """Display the current configuration."""
+    for field in config._fields:
+        print(f"{field}: {getattr(config, field)}")
+
+
 def set_config_parameter(config):
     """Modify a configuration parameter."""
     fields = config._fields

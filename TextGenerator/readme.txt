@@ -1,33 +1,23 @@
-Text Generator
+InfernoLM: The Language Model Inferencer
+----------------------------------------
 
-This Python script leverages the Hugging Face transformers library to generate text using several language models including GPT-2 XL and custom LLAMA models.
+Welcome to InfernoLM, an intuitive tool designed to provide seamless interaction with pre-trained language models. Whether you're looking to generate creative text or draw inferences from prompts, InfernoLM is here to assist.
 
-Setup
+Features:
+- Dynamic model loading: Easily select and switch between different pre-trained models using a simple GUI.
+- Flexible device options: Run models on CPU or CUDA-enabled GPUs.
+- Intuitive interface: A straightforward menu-driven system for effortless text inferencing.
+- Enhanced user experience: User-friendly error messages and hints guide you through potential pitfalls.
 
-Ensure you have the necessary Python libraries installed:
+Getting Started:
+Simply run the main script, follow the on-screen prompts, and you're on your way to generating creative and insightful text. When prompted, select the directory containing your pre-trained model and tokenizer files, and InfernoLM will handle the rest.
 
-pip install torch transformers
-The program uses local model files. Please make sure you have downloaded the necessary models to your local machine.
+Requirements:
+- PyTorch with (optional) CUDA support for GPU inferencing.
+- Transformers library from Hugging Face.
+- A pre-trained model and corresponding tokenizer.
 
-Usage
+Feedback and Contributions:
+We always welcome user feedback to make InfernoLM even better. If you encounter any issues or have suggestions, please reach out. Open source contributions are also encouraged!
 
-To run the program, navigate to the directory containing the text_generator.py file (or whatever you've named your Python script), and run:
-
-
-python text_generator.py
-This will start the text generator program and present you with a menu to either generate text or exit the program.
-
-When you choose to generate text, you will be prompted to:
-
-Choose a device for inferencing (cpu or cuda:0 for GPU).
-
-Select the model you want to use for text generation.
-
-Decide whether you want to use sequential execution (type yes or no).
-
-Provide a prompt for text generation.
-Specify the maximum length for the generated text.
-
-Define the "temperature" of the output, which affects the randomness of the output.
-
-After the text has been generated, you can choose to generate more text with the same model, change the model, or exit the program.
+Thank you for choosing InfernoLM. Dive into the world of language models with ease and innovation!

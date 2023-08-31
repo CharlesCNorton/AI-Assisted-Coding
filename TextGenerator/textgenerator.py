@@ -4,7 +4,9 @@ import torch
 import gc
 import tkinter as tk
 from tkinter import filedialog
+from colorama import init, Fore, Style
 
+init(autoreset=True)
 warnings.filterwarnings("ignore")
 
 class InfernoLM:
@@ -31,7 +33,7 @@ class InfernoLM:
         except Exception as e:
             raise ValueError(f"An error occurred while loading the model: {str(e)}")
 
-    def infer_text(self, prompt, mode="full", max_length=100, temperature=0.7, top_p=0.9):
+    def infer_text(self, prompt, mode="full", max_length=100, temperature=0.7, top_p=0.9, real_time=False):
         try:
             inputs = self.tokenizer(prompt, return_tensors='pt', padding=True, truncation=True, max_length=max_length).to(self.device)
             generation_config = {
@@ -43,9 +45,20 @@ class InfernoLM:
                 'top_p': top_p,
                 'top_k': 50
             }
-            outputs = self.model.generate(**generation_config)
-            inferred_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
+            if real_time:
+                output_tokens = []
+                for i in range(max_length):
+                    generation_config['max_length'] = i + 1
+                    outputs = self.model.generate(**generation_config)
+                    output_tokens.append(outputs[0][-1].item())
+                    print(self.tokenizer.decode([output_tokens[-1]], skip_special_tokens=True), end='', flush=True)
+                inferred_text = self.tokenizer.decode(output_tokens, skip_special_tokens=True)
+            else:
+                outputs = self.model.generate(**generation_config)
+                inferred_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+            # Truncate based on mode
             split_text = inferred_text.split(".")
             if mode == "short" and len(split_text) > 1:
                 inferred_text = split_text[0] + "."
@@ -58,7 +71,6 @@ class InfernoLM:
         except Exception as e:
             raise ValueError(f"An error occurred during text inferencing: {str(e)}")
 
-
 def select_path():
     root = tk.Tk()
     root.withdraw()
@@ -66,13 +78,15 @@ def select_path():
     return folder_selected
 
 def display_menu():
-    print("\nInfernoLM: The Language Model Inferencer\n")
+    print(Fore.CYAN + "\nInfernoLM: The Language Model Inferencer\n")
     print("1. Infer Text")
     print("2. Switch Model")
-    print("3. Exit")
+    print("3. Toggle Real-time Token Output")
+    print("4. Exit")
+    print(Style.RESET_ALL)
 
 def main():
-    print("Welcome to InfernoLM: The Language Model Inferencer!")
+    print(Fore.GREEN + "Welcome to InfernoLM: The Language Model Inferencer!")
     model_path = select_path()
     if not model_path:
         print("No directory selected. Exiting.")
@@ -91,14 +105,13 @@ def main():
         precision = "float32"
 
     inferencer = InfernoLM(device=device_choice, precision=precision, model_path=model_path)
-
+    real_time_output = False
     while True:
         display_menu()
-        choice = input("Enter your choice (1, 2, or 3): ")
+        choice = input("Enter your choice (1, 2, 3, or 4): ")
         if choice == "1":
             prompt = input("\nEnter your prompt: ")
             mode = input("Select the mode (short, medium, long, full, custom): ")
-
 
             if mode == "custom":
                 max_length = int(input("Define the maximum length (e.g., 100): "))
@@ -106,7 +119,8 @@ def main():
                 max_length = 500
 
             temperature = float(input("Set the temperature (e.g., 0.7): "))
-            inferred_text = inferencer.infer_text(prompt, mode, max_length, temperature)
+            print(Fore.YELLOW)
+            inferred_text = inferencer.infer_text(prompt, mode, max_length, temperature, real_time=real_time_output)
             print("\nInferred Text:")
             print(inferred_text)
         elif choice == "2":
@@ -118,10 +132,14 @@ def main():
             torch.cuda.empty_cache()
             inferencer = InfernoLM(device=device_choice, precision=precision, model_path=model_path)
         elif choice == "3":
-            print("\nThank you for using InfernoLM. Farewell!")
+            real_time_output = not real_time_output
+            status = "ON" if real_time_output else "OFF"
+            print(f"Real-time Token Output is now {status}")
+        elif choice == "4":
+            print(Fore.GREEN + "\nThank you for using InfernoLM. Farewell!")
             break
         else:
-            print("\nInvalid selection. Please enter 1, 2, or 3.")
+            print(Fore.RED + "\nInvalid selection. Please enter 1, 2, 3, or 4.")
 
 if __name__ == "__main__":
     main()

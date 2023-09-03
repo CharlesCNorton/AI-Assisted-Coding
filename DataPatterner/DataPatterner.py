@@ -1,60 +1,56 @@
 import re
 import os
 
+def prompt_file_path(message):
+    """Prompts the user for a file path and checks if it exists."""
+    while True:
+        file_path = input(message)
+        if os.path.exists(file_path):
+            return file_path
+        print(f"File {file_path} not found.")
+
+def prompt_for_regex():
+    """Prompts the user for a regex pattern."""
+    while True:
+        try:
+            regex = input("Enter the regex pattern: ")
+            re.compile(regex)
+            return regex
+        except re.error:
+            print("Invalid regex pattern. Please try again.")
+
 def read_input_file(file_path):
     """Reads the content of the input file."""
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
-            content = file.readlines()
-        return content
+            return file.readlines()
     except Exception as e:
         print(f"Error reading file: {e}")
         return []
 
 def write_to_output_file(file_path, data):
     """Writes parsed data to the output file, with overwrite confirmation."""
-    if os.path.exists(file_path):
-        overwrite = input(f"{file_path} already exists. Do you want to overwrite? (y/n): ")
-        if overwrite.lower() != 'y':
-            print("Operation aborted.")
-            return
+    if os.path.exists(file_path) and input(f"{file_path} already exists. Do you want to overwrite? (y/n): ").lower() != 'y':
+        print("Operation aborted.")
+        return
 
     try:
         with open(file_path, 'w', encoding='utf-8') as file:
-            for line in data:
-                file.write(line + '\n')
+            file.writelines(f"{line}\n" for line in data)
         print(f"Data written to {file_path}")
     except Exception as e:
         print(f"Error writing to file: {e}")
 
 def parse_data(content, regex_pattern):
     """Parses data lines based on the provided regex pattern."""
-    parsed_data = []
-    for line in content:
-        try:
-            match = re.search(regex_pattern, line)
-            if match:
-                parsed_data.append(match.group(0))
-        except re.error:
-            print("Invalid regex pattern.")
-            return []
-    return parsed_data
+    return [match.group(0) for line in content if (match := re.search(regex_pattern, line))]
 
 def test_pattern_on_sample(content, regex_pattern):
     """Tests regex pattern on sample lines for user verification."""
-    test_samples = content[:5]  # Taking the first 5 lines as samples
-    for sample in test_samples:
-        try:
-            match = re.search(regex_pattern, sample)
-            if match:
-                print(f"Original Line: {sample.strip()}")
-                print(f"Matched: {match.group(0)}\n")
-            else:
-                print(f"Original Line: {sample.strip()}")
-                print("No Match\n")
-        except re.error:
-            print("Invalid regex pattern.")
-            return
+    for sample in content[:5]:
+        match = re.search(regex_pattern, sample)
+        print(f"Original Line: {sample.strip()}")
+        print(f"Matched: {match.group(0)}\n" if match else "No Match\n")
 
 def main():
     print("Welcome to the Data Parser!")
@@ -68,14 +64,9 @@ def main():
         choice = input("\nEnter your choice: ")
 
         if choice == '1':
-            input_file = input("Enter the path to the input data file: ")
-            if not os.path.exists(input_file):
-                print(f"File {input_file} not found.")
-                continue
-
+            input_file = prompt_file_path("Enter the path to the input data file: ")
             output_file = input("Enter the path to the output file: ")
-
-            regex_pattern = input("Enter the regex pattern: ")
+            regex_pattern = prompt_for_regex()
 
             content = read_input_file(input_file)
             parsed_data = parse_data(content, regex_pattern)
@@ -87,12 +78,8 @@ def main():
             write_to_output_file(output_file, parsed_data)
 
         elif choice == '2':
-            input_file = input("Enter the path to the sample data file: ")
-            if not os.path.exists(input_file):
-                print(f"File {input_file} not found.")
-                continue
-
-            regex_pattern = input("Enter the regex pattern to test: ")
+            input_file = prompt_file_path("Enter the path to the sample data file: ")
+            regex_pattern = prompt_for_regex()
 
             content = read_input_file(input_file)
             test_pattern_on_sample(content, regex_pattern)

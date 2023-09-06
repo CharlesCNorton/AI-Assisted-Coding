@@ -71,6 +71,39 @@ class InfernoLM:
         except Exception as e:
             raise ValueError(f"An error occurred during text inferencing: {str(e)}")
 
+    def chat_with_assistant(self, max_length=100, temperature=0.7, top_p=0.9, max_context_tokens=2048):
+        context_history = "assistant: "
+        while True:
+            user_input = input("You: ")
+            context_history += f"user: {user_input}.."
+
+            # Limit the context to max_context_tokens
+            tokens = self.tokenizer.encode(context_history, add_special_tokens=False)
+            if len(tokens) > max_context_tokens:
+                tokens = tokens[-max_context_tokens:]
+            context = self.tokenizer.decode(tokens)
+
+            # Generate a response
+            try:
+                inferred_text = self.infer_text(context, max_length=max_length, temperature=temperature, top_p=top_p)
+            except Exception as e:
+                print(f"An error occurred: {e}")
+                continue
+
+            # Extract the assistant's last response and remove one period for display
+            assistant_responses = inferred_text.split("..")
+            if len(assistant_responses) > 1:
+                assistant_response = assistant_responses[-2] + ".."
+                print(f"Assistant: {assistant_response[:-1]}")  # Remove one period for display
+                context_history += f"assistant: {assistant_response}"
+
+            # Check if user wants to exit the chat
+            if user_input.lower() == "quit" or user_input.lower() == "exit":
+                break
+
+
+
+
 def select_path():
     root = tk.Tk()
     root.withdraw()
@@ -82,7 +115,8 @@ def display_menu():
     print("1. Infer Text")
     print("2. Switch Model")
     print("3. Toggle Real-time Token Output")
-    print("4. Exit")
+    print("4. Chat with Assistant")
+    print("5. Exit")
     print(Style.RESET_ALL)
 
 def main():
@@ -108,7 +142,7 @@ def main():
     real_time_output = False
     while True:
         display_menu()
-        choice = input("Enter your choice (1, 2, 3, or 4): ")
+        choice = input("Enter your choice (1, 2, 3, 4, or 5): ")
         if choice == "1":
             prompt = input("\nEnter your prompt: ")
             mode = input("Select the mode (short, medium, long, full, custom): ")
@@ -136,10 +170,13 @@ def main():
             status = "ON" if real_time_output else "OFF"
             print(f"Real-time Token Output is now {status}")
         elif choice == "4":
+            print("\nEntering Chatbot Mode. Type 'quit' or 'exit' to leave.")
+            inferencer.chat_with_assistant(max_length=500, temperature=0.7, top_p=0.9)
+        elif choice == "5":
             print(Fore.GREEN + "\nThank you for using InfernoLM. Farewell!")
             break
         else:
-            print(Fore.RED + "\nInvalid selection. Please enter 1, 2, 3, or 4.")
+            print(Fore.RED + "\nInvalid selection. Please enter 1, 2, 3, 4, or 5.")
 
 if __name__ == "__main__":
     main()

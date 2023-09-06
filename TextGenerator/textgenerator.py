@@ -71,12 +71,14 @@ class InfernoLM:
             raise ValueError(f"An error occurred during text inferencing: {str(e)}")
 
     def chat_with_assistant(self, max_length=100, temperature=0.7, top_p=0.9, max_context_tokens=2048):
-        context_history = "assistant: "
+        constant_context = "System: This is a conversation between a user and an AI assistant. The user can ask the assistant questions, seek advice, or engage in casual conversation."
+
+        context_history = constant_context + " assistant: "
         stop_characters = ".!?"
 
         while True:
             user_input = input("You: ")
-            context_history += f"user: {user_input}"
+            context_history += f"user: {user_input} "
 
             tokens = self.tokenizer.encode(context_history, add_special_tokens=False)
             if len(tokens) > max_context_tokens:
@@ -90,17 +92,15 @@ class InfernoLM:
                 continue
 
             assistant_responses = inferred_text.split("assistant: ")[-1]
-
-            # Look for the first stop character to end the assistant's response
             assistant_response = ""
             for char in assistant_responses:
                 assistant_response += char
                 if char in stop_characters:
                     break
 
-            if assistant_response.strip():  # Check if the assistant's response is not empty
+            if assistant_response.strip():
                 print(f"Assistant: {assistant_response}")
-                context_history += f"assistant: {assistant_response}"
+                context_history += f"assistant: {assistant_response} "
             else:
                 print("Assistant: I didn't catch that, could you please repeat?")
 

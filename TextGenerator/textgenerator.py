@@ -58,7 +58,6 @@ class InfernoLM:
                 outputs = self.model.generate(**generation_config)
                 inferred_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-            # Truncate based on mode
             split_text = inferred_text.split(".")
             if mode == "short" and len(split_text) > 1:
                 inferred_text = split_text[0] + "."
@@ -73,35 +72,40 @@ class InfernoLM:
 
     def chat_with_assistant(self, max_length=100, temperature=0.7, top_p=0.9, max_context_tokens=2048):
         context_history = "assistant: "
+        stop_characters = ".!?"
+
         while True:
             user_input = input("You: ")
-            context_history += f"user: {user_input}.."
+            context_history += f"user: {user_input}"
 
-            # Limit the context to max_context_tokens
             tokens = self.tokenizer.encode(context_history, add_special_tokens=False)
             if len(tokens) > max_context_tokens:
                 tokens = tokens[-max_context_tokens:]
             context = self.tokenizer.decode(tokens)
 
-            # Generate a response
             try:
-                inferred_text = self.infer_text(context, max_length=max_length, temperature=temperature, top_p=top_p)
+                inferred_text = self.infer_text(f"{context}assistant: ", max_length=max_length, temperature=temperature, top_p=top_p)
             except Exception as e:
                 print(f"An error occurred: {e}")
                 continue
 
-            # Extract the assistant's last response and remove one period for display
-            assistant_responses = inferred_text.split("..")
-            if len(assistant_responses) > 1:
-                assistant_response = assistant_responses[-2] + ".."
-                print(f"Assistant: {assistant_response[:-1]}")  # Remove one period for display
-                context_history += f"assistant: {assistant_response}"
+            assistant_responses = inferred_text.split("assistant: ")[-1]
 
-            # Check if user wants to exit the chat
+            # Look for the first stop character to end the assistant's response
+            assistant_response = ""
+            for char in assistant_responses:
+                assistant_response += char
+                if char in stop_characters:
+                    break
+
+            if assistant_response.strip():  # Check if the assistant's response is not empty
+                print(f"Assistant: {assistant_response}")
+                context_history += f"assistant: {assistant_response}"
+            else:
+                print("Assistant: I didn't catch that, could you please repeat?")
+
             if user_input.lower() == "quit" or user_input.lower() == "exit":
                 break
-
-
 
 
 def select_path():

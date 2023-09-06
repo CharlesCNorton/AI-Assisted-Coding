@@ -56,7 +56,9 @@ class Calculator:
             'sqrt': math.sqrt,
             'log': math.log,
             'sin': math.sin,
-            'cos': math.cos
+            'cos': math.cos,
+            'tan': math.tan,
+            'exp': math.exp
         }
 
     def eval_expr(self, expr):
@@ -87,13 +89,16 @@ class CalculatorGUI:
         self.window.title('Calculator')
         self.entry = tk.Entry(self.window, width=35, font=('Arial', 14))
         self.entry.grid(row=0, column=0, columnspan=5, padx=10, pady=10)
-
+        self.entry.bind('<Return>', self.equals)
+        self.entry.bind('<Escape>', self.clear)
+        self.entry.focus_set()  # Set focus on the Entry widget
+        
         buttons = [
             ['7', '8', '9', '/', 'sqrt', '(', ')'],
             ['4', '5', '6', '*', 'log', 'pi', 'e'],
             ['1', '2', '3', '-', 'sin', '^', 'c'],
             ['0', '.', '=', '+', 'cos', 'h', 'g'],
-            ['Clear', '', '', '', '', '', '']
+            ['Clear', '', '', '', 'tan', 'exp', '']
         ]
 
         tooltips = {
@@ -105,7 +110,9 @@ class CalculatorGUI:
             'sqrt': 'Square root',
             'log': 'Natural logarithm',
             'sin': 'Sine function',
-            'cos': 'Cosine function'
+            'cos': 'Cosine function',
+            'tan': 'Tangent function',
+            'exp': 'Exponential function'
         }
 
         for i, row in enumerate(buttons):
@@ -121,16 +128,17 @@ class CalculatorGUI:
                     ToolTip(btn, tooltips[button])
 
     def handle_button_click(self, button):
+        self.entry.focus_set()  # Set focus back to Entry widget
         if button == '=':
-            self.equals()
+            self.equals(None)
         elif button == 'Clear':
-            self.clear()
+            self.clear(None)
         else:
             current_expression = self.entry.get()
             self.entry.delete(0, 'end')
             self.entry.insert('end', current_expression + button)
 
-    def equals(self):
+    def equals(self, event):
         expression = self.entry.get().strip()
         if not expression:
             self.show_error('Empty input')
@@ -142,7 +150,7 @@ class CalculatorGUI:
             except Exception as e:
                 self.show_error(str(e))
 
-    def clear(self):
+    def clear(self, event):
         self.entry.delete(0, 'end')
 
     def show_error(self, message):

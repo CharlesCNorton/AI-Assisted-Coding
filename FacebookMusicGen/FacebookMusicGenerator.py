@@ -1,78 +1,87 @@
 from transformers import AutoProcessor, MusicgenForConditionalGeneration
 import scipy.io.wavfile
-import os
+from pathlib import Path  # Imported pathlib for more intuitive file operations
 import traceback
-import re  # Moved this import to the top
+import re
 from datetime import datetime
 from colorama import init, Fore, Back, Style
 
+# Initialize colorama
 init(autoreset=True)
 
+# Constants
 MODEL_MAP = {
     "1": "facebook/musicgen-small",
     "2": "facebook/musicgen-medium",
     "3": "facebook/musicgen-large",
 }
+OUTPUT_PATH = Path("ENTER_YOUR_DESIRED_PATH")  # Changed to use pathlib.Path
 
-OUTPUT_PATH = "ENTER_YOUR_DESIRED_PATH" 
-
-def validate_filename(filename):
-    if not re.match("^[\w\-\_]*$", filename):
+# Function to validate filename
+def validate_filename(filename: str) -> str:
+    if not re.match("^[\w\-\_]*$", filename) or not filename:
         return datetime.now().strftime("%Y%m%d_%H%M%S") + ".wav"
-    elif not filename:
-        return datetime.now().strftime("%Y%m%d_%H%M%S") + ".wav"
-    return filename + ".wav"
+    return f"{filename}.wav"
 
-def generate_music(model_name):
+# Function to load model
+def load_model(model_name: str):
+    return MusicgenForConditionalGeneration.from_pretrained(model_name)
+
+# Function to generate audio from text
+def generate_audio(model, text: str):
+    processor = AutoProcessor.from_pretrained(model.config.name_or_path)
+    inputs = processor(text=[text], padding=True, return_tensors="pt")
+    return model.generate(**inputs, max_new_tokens=256)[0, 0].numpy()
+
+def generate_music(model_name: str):
     try:
-        model = MusicgenForConditionalGeneration.from_pretrained(model_name)
-        text = input("Enter the text you want to convert to music (Cannot be empty): ")
+        # Load model
+        model = load_model(model_name)
 
-        if not text.strip() or len(text) > 1000:
-            print(Fore.RED + "Text input was empty or too long. Please try again with valid text (up to 1000 characters).")
+        # Get and validate text input
+        text = input("Enter the text you want to convert to music (Cannot be empty): ").strip()
+        if not text or len(text) > 1000:
+            print(f"{Fore.RED}Text input was empty or too long. Please try again.")
             return
 
-        processor = AutoProcessor.from_pretrained(model_name)
-        inputs = processor(text=[text], padding=True, return_tensors="pt")
+        # Generate audio
+        audio_array = generate_audio(model, text)
 
-        audio_values = model.generate(**inputs, max_new_tokens=256)
-        audio_array = audio_values[0, 0].numpy()
+        # Validate and generate filename
+        filename = validate_filename(input("Enter a name for the output file: ").strip())
 
-        filename = input("Enter a name for the output file (Cannot be empty for default name): ").strip()
-        filename = validate_filename(filename)
-
+        # Write audio to file
         sampling_rate = model.config.audio_encoder.sampling_rate
-        scipy.io.wavfile.write(os.path.join(OUTPUT_PATH, filename), rate=sampling_rate, data=audio_array)
+        scipy.io.wavfile.write(OUTPUT_PATH / filename, rate=sampling_rate, data=audio_array)
 
         print(f"Music has been successfully saved to {filename}")
 
     except OSError:
-        print("An error occurred while trying to load the model or write the file. Please check your internet connection and file system, and try again.")
+        print(f"{Fore.RED}An error occurred while trying to load the model or write the file.")
         print(traceback.format_exc())
     except ValueError:
-        print("An error occurred while trying to process the text input or generate the music. Please check your text input, and try again.")
+        print(f"{Fore.RED}An error occurred during text processing or music generation.")
         print(traceback.format_exc())
     except Exception as e:
-        print("An unexpected error occurred: " + str(e))
+        print(f"{Fore.RED}An unexpected error occurred: {e}")
         print(traceback.format_exc())
 
 def main():
     while True:
-        print(Fore.BLUE + "# Welcome to the Facebook Music Generator!")
-        print(Fore.GREEN + "# Please select a model:")
-        print(Fore.YELLOW + "# 1: Small Model")
-        print(Fore.YELLOW + "# 2: Medium Model")
-        print(Fore.YELLOW + "# 3: Large Model")
-        print(Fore.RED + "# q: Quit")
-        user_input = input("Enter your choice (1-3 or q): ").strip()
+        print(f"{Fore.BLUE}# Welcome to the Facebook Music Generator!")
+        print(f"{Fore.GREEN}# Please select a model:")
+        for k, v in MODEL_MAP.items():
+            print(f"{Fore.YELLOW}# {k}: {v.split('/')[-1]}")
+        print(f"{Fore.RED}# q: Quit")
 
+        user_input = input("Enter your choice: ").strip()
         if user_input.isdigit() and user_input in MODEL_MAP:
             generate_music(MODEL_MAP[user_input])
         elif user_input.lower() == 'q':
             print("Thank you for using MusicGen. Goodbye!")
             break
         else:
-            print("Invalid input. Please enter a number between 1 and 3 or 'q' without any other characters.")
+            print(f"{Fore.RED}Invalid input. Please enter a valid option.")
 
 if __name__ == "__main__":
     main()

@@ -4,9 +4,13 @@ import random
 from collections import deque
 
 def generate_maze(n_rows, n_cols, ix, iy):
+    """
+    Generate a maze using depth-first search.
+    """
     maze = [[0] * n_cols for _ in range(n_rows)]
     directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
     stack = deque([(ix, iy)])
+
     while stack:
         x, y = stack[-1]
         maze[y][x] = 1
@@ -14,6 +18,7 @@ def generate_maze(n_rows, n_cols, ix, iy):
                                if 0 <= x + direction[0]*2 < n_rows
                                and 0 <= y + direction[1]*2 < n_cols
                                and maze[y + direction[1]*2][x + direction[0]*2] == 0]
+                               
         if possible_directions:
             dx, dy = random.choice(possible_directions)
             maze[y + dy][x + dx] = 1
@@ -21,9 +26,13 @@ def generate_maze(n_rows, n_cols, ix, iy):
             stack.append((x + dx*2, y + dy*2))
         else:
             stack.pop()
+            
     return maze
 
 def construct_graph(maze):
+    """
+    Convert a maze into a graph representation.
+    """
     G = nx.Graph()
     rows, cols = len(maze), len(maze[0])
     for r in range(rows):
@@ -36,6 +45,9 @@ def construct_graph(maze):
     return G
 
 def plot_maze(maze, path=None, save=False):
+    """
+    Display the maze, optionally with a path.
+    """
     plt.figure(figsize=(10,10))
     plt.imshow(maze, cmap=plt.cm.binary)
     if path is not None:
@@ -46,21 +58,39 @@ def plot_maze(maze, path=None, save=False):
     plt.show()
 
 def get_input(prompt, default):
+    """
+    Get user input, with a default value.
+    """
     result = input(prompt)
     return default if result.strip() == '' else int(result)
 
 def print_header():
+    """
+    Display the program header.
+    """
     print("\n" + "="*30)
     print(" "*5 + "Maze Generator and Solver")
     print("="*30)
 
 def print_options():
+    """
+    Display the available menu options.
+    """
     print("1. Generate a new maze")
     print("2. Save maze to file")
     print("3. Exit")
 
 def select_difficulty():
-    size_dict = {"easy": 11, "medium": 21, "hard": 31, "extreme": 41, "insane": 51}
+    """
+    Get user-selected difficulty level and map it to a maze size.
+    """
+    size_dict = {
+        "easy": 11, 
+        "medium": 21, 
+        "hard": 31, 
+        "extreme": 41, 
+        "insane": 51
+    }
     while True:
         difficulty = input("Select difficulty (Easy, Medium, Hard, Extreme, Insane): ").lower()
         if difficulty in size_dict:
@@ -69,13 +99,18 @@ def select_difficulty():
             print("Invalid difficulty. Please enter again.")
 
 def main():
+    """
+    Main program loop.
+    """
     path = None
     start, end = None, None
     maze = None
     while True:
         print_header()
         print_options()
+        
         user_input = input("\nPlease choose an option: ")
+        
         if user_input == "1":
             size = select_difficulty()
             start_row = get_input(f"Enter the start row (0 to {size-2}) or press enter for default: ", 0)
@@ -83,10 +118,12 @@ def main():
             end_row = get_input(f"Enter the end row (1 to {size-1}) or press enter for default: ", size-1)
             end_col = get_input(f"Enter the end column (1 to {size-1}) or press enter for default: ", size-1)
             start, end = (start_row, start_col), (end_row, end_col)
+            
             path = None
             attempts = 0
-            print("Generating maze...")
+            
             while path is None and attempts < 10:
+                print("Generating maze...")
                 maze = generate_maze(size, size, start_row, start_col)
                 maze[start_row][start_col] = 1
                 maze[end_row][end_col] = 1
@@ -96,8 +133,8 @@ def main():
                     path = nx.dijkstra_path(G, start, end)
                     print("Path found!")
                 except nx.NetworkXNoPath:
-                    print("No path found. Generating a new maze...")
                     attempts += 1
+                    print("No path found. Generating a new maze...")
             if path is None:
                 print("No valid maze found after 10 attempts. Try again.")
             else:

@@ -42,35 +42,36 @@ def compute_next_generation(grid):
     # Apply the rules of the Game of Life using logical operations
     return ((grid == 1) & (num_neighbors >= 2) & (num_neighbors <= 3)) | ((grid == 0) & (num_neighbors == 3))
 
-# Set up the plot
-try:
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 16))
-except Exception as e:
-    print("Error setting up the plot. Error: ", str(e))
-    raise
+def setup_plot(grid):
+    """Set up the plot for the Game of Life."""
+    try:
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 16))
 
-# Use a colormap to make the plot more colorful
-cmap = mcolors.LinearSegmentedColormap.from_list("MyCmap", ["black", "green"])
+        # Use a colormap to make the plot more colorful
+        cmap = mcolors.LinearSegmentedColormap.from_list("MyCmap", ["black", "green"])
+        image = ax1.imshow(grid, cmap=cmap, interpolation='nearest')
+        ax1.set_xticks([])
+        ax1.set_yticks([])
 
-try:
-    image = ax1.imshow(grid, cmap=cmap, interpolation='nearest')
-    ax1.set_xticks([])
-    ax1.set_yticks([])
+        # Add a colorbar
+        cbar = plt.colorbar(image, ax=ax1, ticks=[0, 1])
+        cbar.ax.set_yticklabels(['Dead', 'Alive'])
 
-    # Add a colorbar
-    cbar = plt.colorbar(image, ax=ax1, ticks=[0, 1])
-    cbar.ax.set_yticklabels(['Dead', 'Alive'])
+        # Initial plot for alive and dead cells over generations
+        ax2.set_title('Alive and Dead Cells over Generations')
+        ax2.set_xlabel('Generation')
+        ax2.set_ylabel('Number of Cells')
+        lines = ax2.plot(alive_cells, label='Alive')
+        lines += ax2.plot(dead_cells, label='Dead')
+        ax2.legend()
 
-    # Initial plot for alive and dead cells over generations
-    ax2.set_title('Alive and Dead Cells over Generations')
-    ax2.set_xlabel('Generation')
-    ax2.set_ylabel('Number of Cells')
-    lines = ax2.plot(alive_cells, label='Alive')
-    lines += ax2.plot(dead_cells, label='Dead')
-    ax2.legend()
-except Exception as e:
-    print("Error during plot rendering. Error: ", str(e))
-    raise
+        return fig, ax1, ax2, image, lines
+
+    except Exception as e:
+        print("Error during plot setup. Error: ", str(e))
+        raise
+
+fig, ax1, ax2, image, lines = setup_plot(grid)
 
 def update_image(frame, grid, image):
     """Update the image for a new frame."""

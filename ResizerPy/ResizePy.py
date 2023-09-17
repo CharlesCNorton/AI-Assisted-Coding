@@ -5,40 +5,37 @@ from tkinter import filedialog, messagebox
 from tkinter import ttk
 from PIL import Image, UnidentifiedImageError
 
-SUPPORTED_FORMATS = ["BMP", "DIB", "EPS", "GIF", "ICNS", "ICO", "IM", "JPEG", "JPG", "MSP", "PCX", "PNG", "PPM", "SGI", "SPIDER", "TGA", "TIFF", "WebP", "XBM"]
+SUPPORTED_FORMATS = set(["BMP", "DIB", "EPS", "GIF", "ICNS", "ICO", "IM", "JPEG", "JPG", "MSP", "PCX", "PNG", "PPM", "SGI", "SPIDER", "TGA", "TIFF", "WebP", "XBM"])
 
 def resize_image(input_image_path, output_image_path, size, output_format, progress_bar):
+    file_format = os.path.splitext(input_image_path)[1].replace(".", "").upper()
+    if file_format not in SUPPORTED_FORMATS:
+        messagebox.showerror("Error", f"Invalid file format. Supported formats are: {', '.join(SUPPORTED_FORMATS)}")
+        progress_bar.stop()
+        return
+
     try:
         with Image.open(input_image_path) as original_image:
-            if original_image.format not in SUPPORTED_FORMATS:
-                messagebox.showerror("Error", f"Invalid file format. Supported formats are: {', '.join(SUPPORTED_FORMATS)}")
-                return
-
             exif = original_image.info.get('exif', None)
-
             width, height = original_image.size
-
             if width > height:
                 new_height = size
                 new_width = int(new_height * width / height)
             else:
                 new_width = size
                 new_height = int(new_width * height / width)
-
             resized_image = original_image.resize((new_width, new_height), Image.LANCZOS)
-
             if exif:
                 resized_image.save(output_image_path, output_format, exif=exif)
             else:
                 resized_image.save(output_image_path, output_format)
-
-            progress_bar.stop()
             messagebox.showinfo("Success", "Image was successfully resized.")
-
     except UnidentifiedImageError:
         messagebox.showerror("Error", "Cannot identify the image file.")
     except Exception as e:
         messagebox.showerror("Error", str(e))
+    finally:
+        progress_bar.stop()
 
 def validate_size(size):
     try:
@@ -57,17 +54,14 @@ def validate_format(input_path, format):
     elif format.upper() not in SUPPORTED_FORMATS:
         messagebox.showerror("Error", f"Format must be one of the following: {', '.join(SUPPORTED_FORMATS)}")
         return None
-    else:
-        return format
+    return format.upper()
 
 def start_program():
     window = tk.Tk()
     window.title("Image Resizer")
     window.configure(bg='white')
-
     large_font = ('Verdana', 12)
     small_font = ('Verdana', 10)
-
     input_path = tk.StringVar()
     output_path = tk.StringVar()
     size = tk.StringVar()
@@ -107,19 +101,14 @@ def start_program():
     tk.Label(window, text="Select Input Image:", bg='white', font=large_font).grid(row=0, column=0, sticky='W', padx=10, pady=10)
     tk.Entry(window, textvariable=input_path, font=small_font).grid(row=0, column=1, padx=10)
     tk.Button(window, text="Browse", command=lambda: browse_file(input_path), font=small_font).grid(row=0, column=2, padx=10)
-
     tk.Label(window, text="Select Output Directory:", bg='white', font=large_font).grid(row=1, column=0, sticky='W', padx=10, pady=10)
     tk.Entry(window, textvariable=output_path, font=small_font).grid(row=1, column=1, padx=10)
     tk.Button(window, text="Browse", command=lambda: browse_folder(output_path), font=small_font).grid(row=1, column=2, padx=10)
-
     tk.Label(window, text="Enter Output Format (JPEG, PNG, etc.):", bg='white', font=large_font).grid(row=2, column=0, sticky='W', padx=10, pady=10)
     tk.Entry(window, textvariable=output_format, font=small_font).grid(row=2, column=1, padx=10)
-
     tk.Label(window, text="Enter the Size for the Smaller Side of the Image:", bg='white', font=large_font).grid(row=3, column=0, sticky='W', padx=10, pady=10)
     tk.Entry(window, textvariable=size, font=small_font).grid(row=3, column=1, padx=10)
-
     tk.Button(window, text="Resize", command=resize, font=small_font).grid(row=4, column=0, columnspan=3, pady=10)
-
     progress_bar = ttk.Progressbar(window, mode='indeterminate')
     progress_bar.grid(row=5, column=0, columnspan=3, sticky='EW')
 
@@ -127,7 +116,6 @@ def start_program():
         messagebox.showinfo("Help", "1. Click 'Browse' next to 'Select Input Image' and choose an image file.\n2. Click 'Browse' next to 'Select Output Directory' and choose a directory.\n3. Enter the desired size for the smaller side of the image (in pixels).\n4. Enter the desired output format (JPEG, PNG, etc.).\n5. Click 'Resize'.")
 
     tk.Button(window, text="Help", command=display_help, font=small_font).grid(row=6, column=0, columnspan=3, pady=10)
-
     window.mainloop()
 
 start_program()

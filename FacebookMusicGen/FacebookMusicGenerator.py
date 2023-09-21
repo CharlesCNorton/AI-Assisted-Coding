@@ -42,7 +42,6 @@ def validate_filename(filename: str) -> str:
 def load_model(model_name: str):
     """Loads a pretrained model from HuggingFace hub."""
     global loaded_models
-    # Check if the model is already loaded
     if model_name not in loaded_models:
         model = MusicgenForConditionalGeneration.from_pretrained(model_name)
         loaded_models[model_name] = model.to(device)
@@ -70,20 +69,23 @@ def generate_music(model_name: str):
     """Handles the entire music generation process."""
     try:
         model = load_model(model_name)
-        text = input("Enter the text you want to convert to music (Cannot be empty): ").strip()
-        if not text or len(text) > 1000:
-            colored_print(Fore.RED, "Text input was empty or too long. Please try again.")
-            return
+        batch_size = int(input("Enter batch size: ").strip())
+        texts = [input(f"Enter text {i + 1} of {batch_size} (Cannot be empty): ").strip() for i in range(batch_size)]
+        
+        for text in texts:
+            if not text or len(text) > 1000:
+                colored_print(Fore.RED, "Text input was empty or too long. Skipping this one.")
+                continue
 
-        audio_array = generate_audio(model, text)
-        filename = validate_filename(input("Enter a name for the output file: ").strip())
+            audio_array = generate_audio(model, text)
 
-        if not OUTPUT_PATH.exists():
-            OUTPUT_PATH.mkdir(parents=True)
+            if not OUTPUT_PATH.exists():
+                OUTPUT_PATH.mkdir(parents=True)
 
-        sampling_rate = model.config.audio_encoder.sampling_rate
-        scipy.io.wavfile.write(OUTPUT_PATH / filename, rate=sampling_rate, data=audio_array)
-        colored_print(Fore.GREEN, f"Music has been successfully saved to {filename}")
+            sampling_rate = model.config.audio_encoder.sampling_rate
+            output_file = validate_filename(text)
+            scipy.io.wavfile.write(OUTPUT_PATH / output_file, rate=sampling_rate, data=audio_array)
+            colored_print(Fore.GREEN, f"Music for prompt '{text}' has been successfully saved to {output_file}")
 
     except (OSError, ValueError) as e:
         colored_print(Fore.RED, f"An error occurred: {e}")

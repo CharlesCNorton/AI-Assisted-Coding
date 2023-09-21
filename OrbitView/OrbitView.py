@@ -54,16 +54,23 @@ class App:
         self.zoomScale.set(32)
         self.positionLabel.config(text="")
 
+
+
+
     def update_position(self):
         # Get selected planet name and entered date
         planet_name = self.planetVar.get()
         date = self.dateEntry.get()
 
+        # Check if the date variable is a string. If it is, convert it to a datetime object.
+        if isinstance(date, str):
+            date = datetime.strptime(date, '%Y/%m/%d')
+
         # Update planet position and visualize
         try:
-            position = self.get_planet_position(planet_name, date)
-            self.positionLabel.config(text=f"Planet: {planet_name}\nDate: {date}\nPosition: {position}")
-            self.plot_orbits(planet_name, self.zoomScale.get(), date)
+            position = self.get_planet_position(planet_name, date.strftime('%Y/%m/%d'))
+            self.positionLabel.config(text=f"Planet: {planet_name}\nDate: {date.strftime('%Y/%m/%d')}\nPosition: {position}")
+            self.plot_orbits(planet_name, self.zoomScale.get(), date.strftime('%Y/%m/%d'))
         except (AttributeError, ValueError) as e:
             messagebox.showerror("Error", "Invalid input. Please check the planet name and date format (yyyy/mm/dd).")
 

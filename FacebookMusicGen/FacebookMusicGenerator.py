@@ -1,27 +1,28 @@
 import re
 import scipy.io.wavfile
 import traceback
+import torchaudio
 from colorama import init, Fore
 from datetime import datetime
 from pathlib import Path
 from transformers import AutoProcessor, MusicgenForConditionalGeneration
+from audiocraft.models import MusicGen
+from audiocraft.data.audio import audio_write
 import torch
+import tkinter as tk
+from tkinter import filedialog
 
-# Initialize colorama
 init(autoreset=True)
 
-# Constants
 MODEL_MAP = {
     "1": "facebook/musicgen-small",
     "2": "facebook/musicgen-medium",
     "3": "facebook/musicgen-large",
 }
-OUTPUT_PATH = Path("ENTER_YOUR_DESIRED_PATH")
+OUTPUT_PATH = Path("ENTER_PATH_HERE")
 
-# Default device based on system configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Dictionary to store already loaded models.
 loaded_models = {}
 
 def colored_print(color: str, msg: str):
@@ -65,27 +66,34 @@ def toggle_device():
         colored_print(Fore.RED, "CUDA not available on this system. Staying on CPU.")
     colored_print(Fore.GREEN, f"Switched to {device.type.upper()}.")
 
-def generate_music(model_name: str):
-    """Handles the entire music generation process."""
+def generate_music_with_melody():
+    """Handles the music generation process using an existing melody."""
     try:
-        model = load_model(model_name)
-        batch_size = int(input("Enter batch size: ").strip())
-        texts = [input(f"Enter text {i + 1} of {batch_size} (Cannot be empty): ").strip() for i in range(batch_size)]
+        root = tk.Tk()
+        root.withdraw()
+        melody_path = filedialog.askopenfilename(title="Select a melody file", filetypes=[("Audio Files", "*.mp3 *.wav")])
+        if not melody_path:
+            colored_print(Fore.RED, "No melody file selected. Returning to main menu.")
+            return
+
+        descriptions = []
+        while True:
+            desc = input("Enter description (or hit Enter to skip and finish): ").strip()
+            if not desc:
+                break
+            descriptions.append(desc)
+
+        model = MusicGen.get_pretrained('facebook/musicgen-melody')
+        model.set_generation_params(duration=8)
+        melody, sr = torchaudio.load(melody_path)
+
+        wav = model.generate_with_chroma(descriptions, melody[None].expand(len(descriptions), -1, -1), sr)
         
-        for text in texts:
-            if not text or len(text) > 1000:
-                colored_print(Fore.RED, "Text input was empty or too long. Skipping this one.")
-                continue
-
-            audio_array = generate_audio(model, text)
-
-            if not OUTPUT_PATH.exists():
-                OUTPUT_PATH.mkdir(parents=True)
-
-            sampling_rate = model.config.audio_encoder.sampling_rate
-            output_file = validate_filename(text)
-            scipy.io.wavfile.write(OUTPUT_PATH / output_file, rate=sampling_rate, data=audio_array)
-            colored_print(Fore.GREEN, f"Music for prompt '{text}' has been successfully saved to {output_file}")
+        for idx, one_wav in enumerate(wav):
+            output_file_name = f"melody_based_{idx}.wav"
+            output_path = OUTPUT_PATH / output_file_name
+            audio_write(str(output_path), one_wav.cpu(), model.sample_rate, strategy="loudness")
+            colored_print(Fore.GREEN, f"Generated melody-based music saved as {output_file_name}")
 
     except (OSError, ValueError) as e:
         colored_print(Fore.RED, f"An error occurred: {e}")
@@ -101,6 +109,7 @@ def main():
         colored_print(Fore.GREEN, "# Please select a model:")
         for k, v in MODEL_MAP.items():
             colored_print(Fore.YELLOW, f"# {k}: {v.split('/')[-1]}")
+        colored_print(Fore.MAGENTA, "# m: Generate Music with Melody")
         colored_print(Fore.CYAN, "# t: Toggle CPU/GPU")
         colored_print(Fore.RED, "# q: Quit")
 
@@ -112,6 +121,8 @@ def main():
             break
         elif choice.lower() == 't':
             toggle_device()
+        elif choice.lower() == 'm':
+            generate_music_with_melody()
         else:
             colored_print(Fore.RED, "Invalid input. Please enter a valid option.")
 

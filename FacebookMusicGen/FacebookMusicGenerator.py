@@ -69,7 +69,7 @@ def toggle_device():
 def generate_music_with_melody():
     """Generate music based on melody and descriptions."""
     model = MusicGen.get_pretrained('facebook/musicgen-melody')
-    model.set_generation_params(duration=8)
+    model.set_generation_params(duration=30)
 
     root = tk.Tk()
     root.withdraw()

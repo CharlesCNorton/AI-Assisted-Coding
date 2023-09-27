@@ -1,114 +1,79 @@
-# Import the required libraries
-import tkinter as tk  # For GUI interactions
-from tkinter import filedialog  # File dialog for file selection
-import hashlib  # For generating hash/checksum
-import logging  # For logging
-import os  # For file operations
+import tkinter as tk
+from tkinter import filedialog
+import hashlib
+import logging
+import os
 
-# Initialize the logging framework with an INFO level
-logging.basicConfig(level=logging.INFO)
-
-# Function to calculate the SHA-256 checksum of a file
 def calculate_checksum(filename):
-    sha256_hash = hashlib.sha256()  # Initialize SHA-256 hash object
-    with open(filename, "rb") as f:  # Open file in read-binary mode
-        for byte_block in iter(lambda: f.read(4096), b""):  # Read 4096 bytes at a time
-            sha256_hash.update(byte_block)  # Update the hash object
-    return sha256_hash.hexdigest()  # Return the hexadecimal digest
+    sha256_hash = hashlib.sha256()
+    with open(filename, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
 
-# Function to read all lines from a text file
-def read_file(filename):
-    with open(filename, 'r') as f:  # Open file in read mode
-        return f.readlines()  # Read and return all lines
+def read_write_file(filename, mode, lines=None):
+    with open(filename, mode) as f:
+        if mode == 'r':
+            return f.readlines()
+        elif mode == 'w':
+            for line in lines:
+                f.write(line)
 
-# Function to write lines to a text file
-def write_file(filename, lines):
-    with open(filename, 'w') as f:  # Open file in write mode
-        for line in lines:  # Loop through each line
-            f.write(line)  # Write the line to the file
-
-# Function to remove duplicate lines from a text file
 def remove_duplicates_from_file(filename):
-    logging.info(f"Processing {filename} to remove duplicates.")  # Log the operation
-
-    # Calculate initial checksum of the file for comparison later
+    logging.info(f"Processing {filename} to remove duplicates.")
     initial_checksum = calculate_checksum(filename)
-
     try:
-        # Read lines from the file
-        lines = read_file(filename)
-        total_lines = len(lines)  # Count total lines
-
-        # Remove duplicate lines
+        lines = read_write_file(filename, 'r')
+        total_lines = len(lines)
         unique_lines = list(set(lines))
-        duplicates = total_lines - len(unique_lines)  # Count duplicate lines
+        duplicates = total_lines - len(unique_lines)
 
-        # Display statistics
         print(f"Total lines: {total_lines}")
         print(f"Duplicate lines: {duplicates}")
-
-        # Confirm action from the user
         proceed = input("Do you want to remove duplicates? (y/n): ")
         if proceed.lower() != 'y':
             print("Operation canceled.")
-            return  # Exit the function if user denies
+            return
 
-        # Write back the unique lines to the file
-        write_file(filename, unique_lines)
+        read_write_file(filename, 'w', unique_lines)
 
-    # Handle specific exceptions
-    except FileNotFoundError:
-        logging.error(f"The file {filename} was not found.")
-        print(f"The file {filename} was not found.")
+    except (FileNotFoundError, PermissionError, Exception) as e:
+        logging.error(f"{type(e).__name__} occurred: {e}")
+        print(f"{type(e).__name__} occurred: {e}")
         return
-    except PermissionError:
-        logging.error(f"Permission denied while trying to access {filename}.")
-        print(f"Permission denied while trying to access {filename}.")
-        return
-    except Exception as e:  # Catch-all for other exceptions
-        logging.error(f"An unknown error occurred: {e}")
-        print(f"An unknown error occurred: {e}")
-        return
+
+    final_checksum = calculate_checksum(filename)
+    if initial_checksum != final_checksum:
+        logging.info(f"Successfully removed duplicates from {filename}.")
+        print(f"Successfully removed duplicates from {filename}.")
     else:
-        # Calculate the final checksum
-        final_checksum = calculate_checksum(filename)
+        logging.info(f"No duplicates found in {filename}.")
+        print(f"No duplicates found in {filename}.")
 
-        # Log and display the operation's result
-        if initial_checksum != final_checksum:
-            logging.info(f"Successfully removed duplicates from {filename}.")
-            print(f"Successfully removed duplicates from {filename}.")
-        else:
-            logging.info(f"No duplicates found in {filename}.")
-            print(f"No duplicates found in {filename}.")
-
-# Main function to run the program
 def main():
-    root = tk.Tk()  # Initialize Tkinter root window
-    root.withdraw()  # Hide the Tkinter root window
+    logging.basicConfig(level=logging.INFO)
+    root = tk.Tk()
+    root.withdraw()
 
-    # Loop for the menu
+    menu_actions = {'1': lambda: remove_duplicates_from_file(
+                                filedialog.askopenfilename(title="Select a text file",
+                                                           filetypes=[("Text files", "*.txt")])
+                               ),
+                    '2': lambda: print("Exiting the program. Goodbye!")}
+
     while True:
-        # Display options
         print("1. Remove duplicates from a file")
         print("2. Exit")
         choice = input("Enter your choice: ")
 
-        # Perform actions based on user's choice
-        if choice == '1':
-            filename = filedialog.askopenfilename(title="Select a text file", filetypes=[("Text files", "*.txt")])
-            if filename and os.path.exists(filename):  # Check if a valid file is selected
-                remove_duplicates_from_file(filename)
-            else:
-                logging.warning("No valid file selected. Please try again.")
-                print("No valid file selected. Please try again.")
-        elif choice == '2':
-            logging.info("Exiting the program. Goodbye!")
-            print("Exiting the program. Goodbye!")
-            break  # Exit the loop and end the program
+        action = menu_actions.get(choice)
+        if action:
+            action()
+            if choice == '2':
+                break
         else:
             logging.warning("Invalid choice entered.")
             print("Invalid choice. Please try again.")
 
-# Entry point of the script
 if __name__ == "__main__":
-    main()  # Call the main function
+    main()

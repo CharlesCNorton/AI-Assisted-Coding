@@ -120,6 +120,7 @@ def main():
     x = (root.winfo_screenwidth() - root.winfo_width()) // 2
     y = (root.winfo_screenheight() - root.winfo_height()) // 2
     root.geometry(f"+{x}+{y}")
+    root.attributes('-topmost', True)
     root.mainloop()
 
 if __name__ == '__main__':

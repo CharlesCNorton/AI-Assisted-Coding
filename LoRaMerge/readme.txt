@@ -2,7 +2,8 @@ LoraMerge
 
 LoraMerge is a comprehensive tool designed to merge PEFT adapters with base models. The user-friendly terminal menu and the intuitive GUI directory selection make the model merging process streamlined and straightforward.
 
-Deep Acknowledgment: We owe a tremendous debt of gratitude to TheBloke for the original script that served as a cornerstone for this project. TheBloke's script can be found at this Gist link. Recognizing the complexities involved in merging models, this repository was born out of a necessity. It is our ardent wish that LoraMerge simplifies the model merging journey for many. Once again, thank you, TheBloke, for lighting the path.
+Deep Acknowledgment: We owe a tremendous debt of gratitude to TheBloke for the original script that served as a cornerstone for this project. TheBloke's script can be found at: https://gist.github.com/TheBloke/d31d289d3198c24e0ca68aaf37a19032. Recognizing the complexities involved in merging models, this repository was born out of a necessity. It is our ardent wish that LoraMerge simplifies the model merging journey for many. Once again, thank you, TheBloke, for lighting the path.
+
 
 Practical Usage
 Upon starting LoraMerge, you are greeted with a terminal-based menu:

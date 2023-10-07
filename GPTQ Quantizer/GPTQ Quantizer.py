@@ -1,84 +1,63 @@
-import os
 import tkinter as tk
 from tkinter import filedialog, simpledialog
+from transformers import AutoModelForCausalLM, AutoTokenizer, GPTQConfig
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, GPTQConfig, BitsAndBytesConfig
 
-def select_directory(title="Select Directory"):
-    """Open a dialog to select a directory."""
+def select_path(prompt="Select Directory"):
     root = tk.Tk()
-    root.withdraw()
-    path = filedialog.askdirectory(title=title)
+    root.withdraw()  # Hide the root window
+    path = filedialog.askdirectory(title=prompt)  # Show the directory dialog
     return path
 
-def select_text_file(title="Select Text File"):
-    """Open a dialog to select a text file."""
+def get_bit_choice():
     root = tk.Tk()
-    root.withdraw()
-    filepath = filedialog.askopenfilename(title=title, filetypes=[("Text files", "*.txt")])
-    with open(filepath, 'r') as f:
-        content = f.readlines()
-    return content
+    root.withdraw()  # Hide the root window
+    while True:
+        choice = simpledialog.askstring("Input", "Choose the bit size for quantization (2, 4, 8):")
+        if choice in ['2', '4', '8']:
+            return int(choice)
+        else:
+            print("Invalid bit size. Please choose 2, 4, or 8.")
 
 def main():
+    bit_choice = get_bit_choice()
+
     while True:
         print("\nQuantization Menu:")
-        print("1. GPTQ Quantization - Quantize a model with the GPTQ method.")
-        print("2. 8-bit Quantization using bitsandbytes - Convert a model to 8-bit precision.")
-        print("3. 4-bit Quantization using bitsandbytes - Convert a model to 4-bit precision.")
-        print("4. Advanced 4-bit using NF4 data type - Use the NF4 data type for 4-bit quantization.")
-        print("5. Nested Quantization for memory efficiency - Save more memory using nested quantization.")
-        print("6. Exit")
+        print("1. GPTQ Quantization")
+        print("2. Exit")
         choice = input("\nEnter your choice: ")
 
-        try:
-            if choice == '1':
-                model_path = select_directory(title="Select Model Directory")
-                dataset_choice = input("Do you have a custom dataset in a text file? (yes/no): ")
-                if dataset_choice.lower() == 'yes':
-                    dataset = select_text_file(title="Select Dataset Text File")
-                else:
-                    dataset = "c4"
-                tokenizer = AutoTokenizer.from_pretrained(model_path)
-                gptq_config = GPTQConfig(bits=4, dataset=dataset, tokenizer=tokenizer)
-                model = AutoModelForCausalLM.from_pretrained(model_path, quantization_config=gptq_config)
-                output_path = select_directory(title="Select Output Directory for Quantized Model")
-                model.save_pretrained(output_path)
+        if choice == '1':
+            print(f"Selected {bit_choice}-bit quantization.")
+            print("Loading model...")
+            model_path = select_path("Select Model to Quantize")
+            tokenizer = AutoTokenizer.from_pretrained(model_path)
+            gptq_config = GPTQConfig(bits=bit_choice, dataset="c4", tokenizer=tokenizer)
 
-            elif choice == '2':
-                model_path = select_directory(title="Select Model Directory")
-                model_8bit = AutoModelForCausalLM.from_pretrained(model_path, load_in_8bit=True)
-                output_path = select_directory(title="Select Output Directory for Quantized Model")
-                model_8bit.save_pretrained(output_path)
+            # Determine save path before quantizing
+            save_path = select_path("Select Directory to Save Quantized Model")
 
-            elif choice == '3':
-                model_path = select_directory(title="Select Model Directory")
-                model_4bit = AutoModelForCausalLM.from_pretrained(model_path, load_in_4bit=True)
-                output_path = select_directory(title="Select Output Directory for Quantized Model")
-                model_4bit.save_pretrained(output_path)
+            print("Starting GPTQ quantization...")
+            model = AutoModelForCausalLM.from_pretrained(model_path, quantization_config=gptq_config).to("cuda")
 
-            elif choice == '4':
-                model_path = select_directory(title="Select Model Directory")
-                quantization_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16)
-                model_nf4 = AutoModelForCausalLM.from_pretrained(model_path, quantization_config=quantization_config)
-                output_path = select_directory(title="Select Output Directory for Quantized Model")
-                model_nf4.save_pretrained(output_path)
+            # This ensures any backend requirements are met
+            model.disable_exllama = True
 
-            elif choice == '5':
-                model_path = select_directory(title="Select Model Directory")
-                double_quant_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_use_double_quant=True)
-                model_double_quant = AutoModelForCausalLM.from_pretrained(model_path, quantization_config=double_quant_config)
-                output_path = select_directory(title="Select Output Directory for Quantized Model")
-                model_double_quant.save_pretrained(output_path)
+            # Saving the quantized model
+            print(f"Saving quantized model to {save_path}")
+            model.save_pretrained(save_path)
+            print("GPTQ quantization complete!")
 
-            elif choice == '6':
-                break
+            # Cleaning up
+            del model
+            torch.cuda.empty_cache()
 
-            else:
-                print("Invalid choice. Please choose a valid option.")
+        elif choice == '2':
+            break
 
-        except Exception as e:
-            print(f"Error occurred: {e}")
+        else:
+            print("Invalid choice. Please choose a valid option.")
 
 if __name__ == "__main__":
     main()

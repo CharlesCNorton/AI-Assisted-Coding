@@ -7,8 +7,8 @@ import traceback
 
 def select_path(prompt="Select Directory"):
     root = tk.Tk()
-    root.withdraw()  # Hide the root window
-    path = filedialog.askdirectory(title=prompt)  # Show the directory dialog
+    root.withdraw()
+    path = filedialog.askdirectory(title=prompt)
     return path
 
 def check_model_saved(directory):
@@ -18,12 +18,15 @@ def print_divider():
     print("-" * 50)
 
 def main():
+    global bits
+    bits = 4
+
     while True:
         print_divider()
         print("\nGPTQ Quantization Menu:".center(50))
         print_divider()
-        print("1. GPTQ Quantization")
-        print("2. Set Quantization Bits (Current: 4)")
+        print(f"1. GPTQ Quantization (Current: {bits}-bit)")
+        print("2. Set Quantization Bits")
         print("3. Exit")
         print_divider()
 
@@ -37,7 +40,6 @@ def main():
                 print("[INFO] Loading tokenizer...")
                 tokenizer = AutoTokenizer.from_pretrained(model_path)
 
-                bits = 4
                 gptq_config = GPTQConfig(bits=bits, dataset="c4", tokenizer=tokenizer)
 
                 save_path = select_path("Select Directory to Save Quantized Model")
@@ -51,13 +53,13 @@ def main():
                 print(f"[INFO] Saving quantized model to {save_path}...")
                 model.save_pretrained(save_path)
 
-                # Check if model was actually saved
+
                 if check_model_saved(save_path):
                     print("[SUCCESS] Model saved successfully!")
                 else:
                     print("[ERROR] Model not found in the specified directory after quantization!")
 
-                # Cleanup
+
                 print("[INFO] Cleaning up resources...")
                 del model
                 torch.cuda.empty_cache()
@@ -65,13 +67,13 @@ def main():
 
             elif choice == '2':
                 print("\nSet Quantization Bits:")
-                print("a. 2-bit")
-                print("b. 4-bit (Default)")
+                print("a. 3-bit")
+                print("b. 4-bit")
                 print("c. 8-bit")
                 bit_choice = input("\nSelect bit option (a/b/c): ")
 
                 if bit_choice == 'a':
-                    bits = 2
+                    bits = 3
                 elif bit_choice == 'b':
                     bits = 4
                 elif bit_choice == 'c':

@@ -2,34 +2,43 @@ import os
 import argparse
 import tkinter as tk
 from tkinter import filedialog, messagebox
-
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 import torch
+
+HEADER = '\033[95m'
+OKBLUE = '\033[94m'
+OKCYAN = '\033[96m'
+OKGREEN = '\033[92m'
+WARNING = '\033[93m'
+FAIL = '\033[91m'
+ENDC = '\033[0m'
+BOLD = '\033[1m'
+UNDERLINE = '\033[4m'
 
 def display_menu():
     """
     Display the terminal menu.
     """
     os.system('cls' if os.name == 'nt' else 'clear')
-    print("========= LoraMerge: Merge PEFT Adapters with a Base Model =========")
-    print("\nAn homage to the legendary work by TheBloke:")
-    print("https://gist.github.com/TheBloke/d31d289d3198c24e0ca68aaf37a19032")
-    print("\nOptions:")
-    print("1. Merge models")
-    print("2. Dedication & Profound Acknowledgment to TheBloke")
-    print("3. Exit")
-    choice = input("\nEnter your choice: ")
+    print(OKGREEN + BOLD + "========= LoraMerge: Merge PEFT Adapters with a Base Model =========" + ENDC)
+    print(OKBLUE + "\nAn homage to the legendary work by TheBloke:" + ENDC)
+    print(OKCYAN + "https://gist.github.com/TheBloke/d31d289d3198c24e0ca68aaf37a19032" + ENDC)
+    print(HEADER + "\nOptions:" + ENDC)
+    print("1. " + OKBLUE + "Merge models" + ENDC)
+    print("2. " + OKBLUE + "Dedication & Profound Acknowledgment to TheBloke" + ENDC)
+    print("3. " + OKBLUE + "Exit" + ENDC)
+    choice = input(OKGREEN + BOLD + "\nEnter your choice: " + ENDC)
     return choice
 
 def display_acknowledgment():
     """
     A heartfelt and reverential acknowledgment for TheBloke.
     """
-    print("\nDedication & Profound Acknowledgment:")
-    print("\nLoraMerge, while a humble tool, stands on the shoulders of a giant. TheBloke, not just a name but a beacon in the vast sea of codes, provided the cornerstone. We are but mere mortals iterating upon his magnum opus. Find his seminal work, the origin of our inspiration at:")
-    print("https://gist.github.com/TheBloke/d31d289d3198c24e0ca68aaf37a19032")
-    print("\nTo TheBloke, the guiding star, we owe our deepest gratitude. This tool is but a shrine celebrating your genius.")
+    print(HEADER + "\nDedication & Profound Acknowledgment:" + ENDC)
+    print(OKBLUE + "\nLoraMerge, while a humble tool, stands on the shoulders of a giant. TheBloke, not just a name but a beacon in the vast sea of codes, provided the cornerstone. We are but mere mortals iterating upon his magnum opus. Find his seminal work, the origin of our inspiration at:" + ENDC)
+    print(OKCYAN + "https://gist.github.com/TheBloke/d31d289d3198c24e0ca68aaf37a19032" + ENDC)
+    print(OKBLUE + "\nTo TheBloke, the guiding star, we owe our deepest gratitude. This tool is but a shrine celebrating your genius." + ENDC)
 
 def get_args():
     """
@@ -95,15 +104,15 @@ def main():
 
         if choice == '1':
             merge_models(args)
-            input("\nPress Enter to continue...")
+            input(OKGREEN + "\nPress Enter to continue..." + ENDC)
         elif choice == '2':
             display_acknowledgment()
-            input("\nPress Enter to continue...")
+            input(OKGREEN + "\nPress Enter to continue..." + ENDC)
         elif choice == '3':
-            print("Thank you for using LoraMerge! Exiting...")
+            print(OKBLUE + "Thank you for using LoraMerge! Exiting..." + ENDC)
             break
         else:
-            input("Invalid choice. Press Enter to return to the menu...")
+            input(WARNING + "Invalid choice. Press Enter to return to the menu..." + ENDC)
 
 def user_confirmation(message):
     """

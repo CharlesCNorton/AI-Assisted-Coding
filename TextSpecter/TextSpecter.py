@@ -38,6 +38,12 @@ def categorize_characters(text):
         "frequencies": char_freq
     }
 
+def count_common_words(text):
+    common_words = ["and", "to", "the", "of", "in", "is", "on", "for", "with", "as"]
+    word_freq = Counter(text.lower().split())
+    common_word_counts = {word: word_freq[word] for word in common_words}
+    return common_word_counts
+
 def summarize_characters(filename):
     text = read_file(filename)
     if text is None:
@@ -64,6 +70,11 @@ def summarize_characters(filename):
         print("\nInfrequent characters:")
         for char, count in infrequent_chars.items():
             print(f"'{char}' : {count}")
+
+    common_word_counts = count_common_words(text)
+    print("\nCommon word counts:")
+    for word, count in common_word_counts.items():
+        print(f"{word} : {count}")
 
 if __name__ == "__main__":
     file_path = select_file()

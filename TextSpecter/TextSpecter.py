@@ -39,7 +39,7 @@ def categorize_characters(text):
     }
 
 def count_common_words(text):
-    common_words = ["and", "to", "the", "of", "in", "is", "on", "for", "with", "as"]
+    common_words = ["and","to","the","of","in","is","on","for","with","as","it","at","by","an","be","or","we","you","not","from","but","are","they","he","she","we","I","this","that","have","do","was","can","will","my","your","his","her","its","our","their","there","when","where","how","why","which","who","whom","me","us","them"]
     word_freq = Counter(text.lower().split())
     common_word_counts = {word: word_freq[word] for word in common_words}
     return common_word_counts

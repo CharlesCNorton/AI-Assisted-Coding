@@ -1,7 +1,7 @@
 import string
 import tkinter as tk
 from tkinter import filedialog
-from collections import Counter
+from collections import Counter, defaultdict
 
 def select_file():
     root = tk.Tk()
@@ -20,12 +20,12 @@ def read_file(filename):
 def categorize_characters(text):
     char_freq = Counter(text)
 
+    # Character categories
     common_chars = set(string.ascii_letters + string.digits + string.punctuation)
     whitespace_chars = set(string.whitespace)
     diacritics_chars = set("áéíóúýÁÉÍÓÚÝäëïöüÿÄËÏÖÜàèìòùÀÈÌÒÙãñõÃÑÕâêîôûÂÊÎÔÛçÇ")
     currency_chars = set("¢£¤¥€₹₽₺₩$")
-
-    uncommon_chars = set(char_freq.keys()) - common_chars - diacritics_chars - currency_chars
+    uncommon_chars = set(char_freq.keys()) - common_chars - whitespace_chars - diacritics_chars - currency_chars
     unicode_punctuations = set(char for char in char_freq.keys() if char in string.punctuation and char not in common_chars)
 
     return {
@@ -41,8 +41,7 @@ def categorize_characters(text):
 def count_common_words(text):
     common_words = ["and","to","the","of","in","is","on","for","with","as","it","at","by","an","be","or","we","you","not","from","but","are","they","he","she","we","I","this","that","have","do","was","can","will","my","your","his","her","its","our","their","there","when","where","how","why","which","who","whom","me","us","them"]
     word_freq = Counter(text.lower().split())
-    common_word_counts = {word: word_freq[word] for word in common_words}
-    return common_word_counts
+    return {word: word_freq[word] for word in common_words if word in word_freq}
 
 def summarize_characters(filename):
     text = read_file(filename)
@@ -55,6 +54,7 @@ def summarize_characters(filename):
     print(f"Total characters in '{filename}': {len(text)}")
     print(f"Unique characters: {len(freq)}")
 
+    # Summarizing character categories
     for cat, chars in categories.items():
         if cat != "frequencies":
             count = sum(freq[char] for char in chars if char in freq)
@@ -64,17 +64,20 @@ def summarize_characters(filename):
                     if char in freq:
                         print(f"'{char}' : {freq[char]}")
 
+    # Summarizing infrequent characters
     threshold = 0.01 * len(text)
     infrequent_chars = {char: count for char, count in freq.items() if count < threshold}
     if infrequent_chars:
         print("\nInfrequent characters:")
-        for char, count in infrequent_chars.items():
+        for char, count in sorted(infrequent_chars.items(), key=lambda x: x[1]):
             print(f"'{char}' : {count}")
 
+    # Summarizing common words
     common_word_counts = count_common_words(text)
-    print("\nCommon word counts:")
-    for word, count in common_word_counts.items():
-        print(f"{word} : {count}")
+    if common_word_counts:
+        print("\nCommon word counts:")
+        for word, count in sorted(common_word_counts.items(), key=lambda x: x[1], reverse=True):
+            print(f"{word} : {count}")
 
 if __name__ == "__main__":
     file_path = select_file()

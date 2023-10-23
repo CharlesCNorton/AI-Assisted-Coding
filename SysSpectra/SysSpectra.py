@@ -7,7 +7,7 @@ from GPUtil import getGPUs
 from tkinter import Tk, RIGHT, BOTH, X, Button, Frame, Label
 
 # Set refresh rate constant for how frequently the tool updates system stats.
-REFRESH_RATE = 1000
+REFRESH_RATE = 2000
 
 class SysInfo(Frame):
     def __init__(self, *args, **kwargs):

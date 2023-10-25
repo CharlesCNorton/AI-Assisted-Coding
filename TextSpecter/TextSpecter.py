@@ -19,29 +19,31 @@ CHARACTER_CATEGORIES = {
 
 
 def select_file():
+    """Prompt the user to select a file and return the file path."""
     with tk.Tk() as root:
         root.withdraw()
         try:
-            file_path = filedialog.askopenfilename(title="Select a text file", filetypes=[
+            return filedialog.askopenfilename(title="Select a text file", filetypes=[
                 ("Text files", "*.txt"), ("All files", "*.*")])
-            return file_path
         except Exception as e:
             messagebox.showerror("Error", f"Error while selecting the file: {e}")
 
 
 def read_file(filename):
+    """Read the content of the given file."""
     try:
         with open(filename, 'r', encoding='utf-8', errors='ignore') as f:
             return f.read()
     except Exception as e:
         print(f"Error reading the file: {e}")
+        return None
 
 
 def categorize_characters(text):
+    """Categorize the characters in the given text."""
     char_freq = Counter(text)
-
     categories = {
-        name: set(char for char in charset if char in char_freq)
+        name: {char for char in charset if char in char_freq}
         for name, charset in CHARACTER_CATEGORIES.items()
     }
 
@@ -52,11 +54,13 @@ def categorize_characters(text):
 
 
 def count_common_words(text):
+    """Count occurrences of common words in the given text."""
     word_freq = Counter(text.lower().split())
-    return {word: word_freq[word] for word in COMMON_WORDS if word in word_freq}
+    return {word: word_freq[word] for word in COMMON_WORDS}
 
 
 def summarize_characters(filename):
+    """Provide a summary of characters in the given file."""
     text = read_file(filename)
     if text is None:
         return
@@ -89,6 +93,7 @@ def summarize_characters(filename):
 
 
 def main():
+    """Main function to run the character summarizer."""
     file_path = select_file()
     if file_path:
         summarize_characters(file_path)

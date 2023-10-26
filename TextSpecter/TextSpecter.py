@@ -17,17 +17,18 @@ CHARACTER_CATEGORIES = {
     "currency": set("¢£¤¥€₹₽₺₩$")
 }
 
-
 def select_file():
     """Prompt the user to select a file and return the file path."""
-    with tk.Tk() as root:
-        root.withdraw()
-        try:
-            return filedialog.askopenfilename(title="Select a text file", filetypes=[
-                ("Text files", "*.txt"), ("All files", "*.*")])
-        except Exception as e:
-            messagebox.showerror("Error", f"Error while selecting the file: {e}")
-
+    root = tk.Tk()
+    root.withdraw()
+    try:
+        filepath = filedialog.askopenfilename(title="Select a text file", filetypes=[
+            ("Text files", "*.txt"), ("All files", "*.*")])
+        root.destroy()
+        return filepath
+    except Exception as e:
+        messagebox.showerror("Error", f"Error while selecting the file: {e}")
+        root.destroy()
 
 def read_file(filename):
     """Read the content of the given file."""
@@ -37,7 +38,6 @@ def read_file(filename):
     except Exception as e:
         print(f"Error reading the file: {e}")
         return None
-
 
 def categorize_characters(text):
     """Categorize the characters in the given text."""
@@ -52,12 +52,10 @@ def categorize_characters(text):
 
     return categories, char_freq
 
-
 def count_common_words(text):
     """Count occurrences of common words in the given text."""
     word_freq = Counter(text.lower().split())
     return {word: word_freq[word] for word in COMMON_WORDS}
-
 
 def summarize_characters(filename):
     """Provide a summary of characters in the given file."""
@@ -91,7 +89,6 @@ def summarize_characters(filename):
         for word, count in sorted(common_word_counts.items(), key=lambda x: x[1], reverse=True):
             print(f"{word} : {count}")
 
-
 def main():
     """Main function to run the character summarizer."""
     file_path = select_file()
@@ -100,7 +97,6 @@ def main():
     else:
         print("No file selected.")
     input("\nPress Enter to exit...")
-
 
 if __name__ == "__main__":
     main()

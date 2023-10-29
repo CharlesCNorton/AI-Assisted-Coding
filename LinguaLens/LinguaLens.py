@@ -38,14 +38,16 @@ def analyze_file(file_path):
             data[length_cat][ending_cat] += 1
             total_sentences += 1
 
-        summary = f"Analyzed {total_sentences} sentences from '{file_path.split('/')[-1]}'.\n"
+        summary = f"Analysis of '{file_path.split('/')[-1]}':\nTotal Sentences: {total_sentences:,.0f}\n" + "-"*40 + "\n"
         results.delete(1.0, tk.END)
         results.insert(tk.END, summary)
 
-        for length, endings in data.items():
-            results.insert(tk.END, f"\n{length} Sentences:\n")
-            for ending, count in endings.items():
-                results.insert(tk.END, f"{ending}: {count}\n")
+        for length in ["Large", "Medium", "Short", "Other"]:
+            if length in data:
+                results.insert(tk.END, f"{length} Sentences:\n")
+                for ending, count in data[length].items():
+                    results.insert(tk.END, f" - {ending}: {count:,.0f}\n")
+                results.insert(tk.END, "\n")
 
     except FileNotFoundError:
         messagebox.showerror("Error", "File not found!")

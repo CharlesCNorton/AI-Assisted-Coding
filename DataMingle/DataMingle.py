@@ -1,6 +1,9 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
 import random
+import time
+import numpy as np
+import os
 
 class DataMingle:
     def __init__(self, master):
@@ -10,19 +13,14 @@ class DataMingle:
         self.input_file_var = tk.StringVar()
         self.output_file_var = tk.StringVar()
 
-        # Menu
         self.build_menu()
 
-        # Input file display
         self.build_input_display()
 
-        # Output file display
         self.build_output_display()
 
-        # Shuffle button
         self.build_shuffle_button()
 
-        # Status bar
         self.build_status_bar()
 
     def build_menu(self):
@@ -93,7 +91,17 @@ class DataMingle:
             with open(input_file, 'r') as file:
                 lines = file.readlines()
 
-            random.shuffle(lines)
+            original_first_line = lines[0]
+
+            seed_value = int(time.time()) ^ int.from_bytes(os.urandom(16), byteorder='big')
+            random.seed(seed_value)
+
+            for _ in range(5):
+                random.shuffle(lines)
+
+            if lines[0] == original_first_line:
+                self.status.set("Warning: After shuffling, the order appears unchanged. Please try again.")
+                return
 
             with open(output_file, 'w') as file:
                 file.writelines(lines)

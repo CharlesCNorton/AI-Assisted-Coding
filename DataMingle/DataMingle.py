@@ -1,8 +1,7 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, Menu, Label, Entry, Button, SUNKEN
 import random
 import time
-import numpy as np
 import os
 
 class DataMingle:
@@ -14,20 +13,16 @@ class DataMingle:
         self.output_file_var = tk.StringVar()
 
         self.build_menu()
-
-        self.build_input_display()
-
-        self.build_output_display()
-
+        self.build_file_displays()
         self.build_shuffle_button()
-
         self.build_status_bar()
 
     def build_menu(self):
-        menu = tk.Menu(self.master)
+        """Build the main menu."""
+        menu = Menu(self.master)
         self.master.config(menu=menu)
 
-        file_menu = tk.Menu(menu)
+        file_menu = Menu(menu, tearoff=0)
         menu.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="Select Input File", command=self.select_input_file)
         file_menu.add_command(label="Select Output Path", command=self.select_output_path)
@@ -35,28 +30,33 @@ class DataMingle:
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.master.quit)
 
-    def build_input_display(self):
-        input_label = tk.Label(self.master, text="Input File:")
-        input_label.pack(pady=20)
+    def build_file_displays(self):
+        """Build the input and output file displays."""
+        file_frame = tk.Frame(self.master)
+        file_frame.pack(pady=20)
 
-        input_display = tk.Entry(self.master, textvariable=self.input_file_var, width=50)
-        input_display.pack(pady=5)
+        input_label = Label(file_frame, text="Input File:")
+        input_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        
+        input_display = Entry(file_frame, textvariable=self.input_file_var, width=50)
+        input_display.grid(row=0, column=1, padx=5, pady=5)
 
-    def build_output_display(self):
-        output_label = tk.Label(self.master, text="Output File:")
-        output_label.pack(pady=20)
-
-        output_display = tk.Entry(self.master, textvariable=self.output_file_var, width=50)
-        output_display.pack(pady=5)
+        output_label = Label(file_frame, text="Output File:")
+        output_label.grid(row=1, column=0, sticky="w", padx=5, pady=5)
+        
+        output_display = Entry(file_frame, textvariable=self.output_file_var, width=50)
+        output_display.grid(row=1, column=1, padx=5, pady=5)
 
     def build_shuffle_button(self):
-        shuffle_button = tk.Button(self.master, text="Shuffle and Save", command=self.shuffle_and_save)
+        """Build the shuffle button."""
+        shuffle_button = Button(self.master, text="Shuffle and Save", command=self.shuffle_and_save)
         shuffle_button.pack(pady=20)
 
     def build_status_bar(self):
+        """Build the status bar at the bottom."""
         self.status = tk.StringVar()
         self.status.set("Ready.")
-        status_bar = tk.Label(self.master, textvariable=self.status, bd=1, relief=tk.SUNKEN, anchor=tk.W)
+        status_bar = Label(self.master, textvariable=self.status, bd=1, relief=SUNKEN, anchor=tk.W)
         status_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
     def select_input_file(self):
@@ -75,8 +75,13 @@ class DataMingle:
         self.status.set("Paths cleared.")
 
     def shuffle_and_save(self):
-        input_file = self.input_file_var.get()
-        output_file = self.output_file_var.get()
+        """Shuffle lines from the input file and save them to the output file."""
+        input_file = self.input_file_var.get().strip()
+        output_file = self.output_file_var.get().strip()
+
+        if not os.path.exists(input_file):
+            messagebox.showerror("Error", "Input file does not exist!")
+            return
 
         if not input_file:
             messagebox.showerror("Error", "Please select an input file!")
@@ -91,13 +96,13 @@ class DataMingle:
             with open(input_file, 'r') as file:
                 lines = file.readlines()
 
+            # Ensure that there are lines to shuffle
+            if not lines:
+                self.status.set("The input file is empty.")
+                return
+
             original_first_line = lines[0]
-
-            seed_value = int(time.time()) ^ int.from_bytes(os.urandom(16), byteorder='big')
-            random.seed(seed_value)
-
-            for _ in range(5):
-                random.shuffle(lines)
+            random.shuffle(lines)
 
             if lines[0] == original_first_line:
                 self.status.set("Warning: After shuffling, the order appears unchanged. Please try again.")

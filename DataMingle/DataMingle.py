@@ -1,30 +1,37 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox, Menu, Label, Entry, Button, SUNKEN
+from tkinter import filedialog, messagebox, Menu, Label, Entry, Button, Frame, StringVar
 import random
 import os
+from threading import Thread
 
 ERROR_MSG = {
     "SELECT_INPUT": "Please select an input file!",
     "INPUT_NOT_EXIST": "Input file does not exist!",
     "SELECT_OUTPUT": "Please select an output file!"
 }
+
 STATUS_MSG = {
     "READY": "Ready.",
     "PATHS_CLEARED": "Paths cleared.",
     "PROCESSING": "Processing...",
     "EMPTY_INPUT": "The input file is empty.",
-    "ORDER_UNCHANGED": "Warning: After shuffling, the order appears unchanged. Please try again."
+    "ORDER_UNCHANGED": "Order appears unchanged after shuffling. Please try again.",
+    "DONE": "Done! Shuffled data saved to: {}",
+    "ERROR": "Error encountered: {}"
 }
 
+FILE_TYPES = [("Text files", "*.txt")]
+DEFAULT_EXTENSION = ".txt"
 
-class DataMingle:
+class DataMingleApp:
     def __init__(self, master):
         """Initialize the main application window."""
         self.master = master
         self.master.title("DataMingle: Text Scrambler for AI Training")
 
-        self.input_file_var = tk.StringVar()
-        self.output_file_var = tk.StringVar()
+        self.input_file_var = StringVar()
+        self.output_file_var = StringVar()
+        self.status_var = StringVar(value=STATUS_MSG["READY"])
 
         self.build_ui()
 
@@ -50,21 +57,22 @@ class DataMingle:
 
     def build_file_displays(self):
         """Display the input and output file paths."""
-        file_frame = tk.Frame(self.master)
+        file_frame = Frame(self.master)
         file_frame.pack(pady=20)
 
-        for idx, name in enumerate(["Input File:", "Output File:"]):
-            Label(file_frame, text=name).grid(row=idx, column=0, sticky="w", padx=5, pady=5)
-            Entry(file_frame, textvariable=(self.input_file_var if idx == 0 else self.output_file_var), width=50).grid(row=idx, column=1, padx=5, pady=5)
+        Label(file_frame, text="Input File:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        Entry(file_frame, textvariable=self.input_file_var, width=50).grid(row=0, column=1, padx=5, pady=5)
+
+        Label(file_frame, text="Output File:").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+        Entry(file_frame, textvariable=self.output_file_var, width=50).grid(row=1, column=1, padx=5, pady=5)
 
     def build_shuffle_button(self):
         """Create the 'Shuffle and Save' button."""
-        Button(self.master, text="Shuffle and Save", command=self.shuffle_and_save).pack(pady=20)
+        Button(self.master, text="Shuffle and Save", command=self.start_shuffle_and_save).pack(pady=20)
 
     def build_status_bar(self):
         """Create the status bar at the bottom of the window."""
-        self.status = tk.StringVar(value=STATUS_MSG["READY"])
-        Label(self.master, textvariable=self.status, bd=1, relief=SUNKEN, anchor=tk.W).pack(side=tk.BOTTOM, fill=tk.X)
+        Label(self.master, textvariable=self.status_var, bd=1, relief=tk.SUNKEN, anchor=tk.W).pack(side=tk.BOTTOM, fill=tk.X)
 
     def select_input_file(self):
         """Select the input text file."""
@@ -76,7 +84,12 @@ class DataMingle:
 
     def set_file_path(self, var, title, save=False):
         """Open a dialog to select a file and set its path."""
-        file_path = (filedialog.asksaveasfilename if save else filedialog.askopenfilename)(title=title, filetypes=[("Text files", "*.txt")], defaultextension=".txt")
+        options = {
+            'title': title,
+            'filetypes': FILE_TYPES,
+            'defaultextension': DEFAULT_EXTENSION
+        }
+        file_path = filedialog.asksaveasfilename(**options) if save else filedialog.askopenfilename(**options)
         if file_path:
             var.set(file_path)
 
@@ -84,7 +97,11 @@ class DataMingle:
         """Clear the selected input and output file paths."""
         self.input_file_var.set("")
         self.output_file_var.set("")
-        self.status.set(STATUS_MSG["PATHS_CLEARED"])
+        self.status_var.set(STATUS_MSG["PATHS_CLEARED"])
+
+    def start_shuffle_and_save(self):
+        """Start the shuffle and save operation in a separate thread to keep UI responsive."""
+        Thread(target=self.shuffle_and_save, daemon=True).start()
 
     def shuffle_and_save(self):
         """Shuffle the lines of the input file and save it to the output path."""
@@ -103,28 +120,31 @@ class DataMingle:
             messagebox.showerror("Error", ERROR_MSG["SELECT_OUTPUT"])
             return
 
-        self.status.set(STATUS_MSG["PROCESSING"])
+        self.status_var.set(STATUS_MSG["PROCESSING"])
         try:
             with open(input_file, 'r') as file:
-                lines = [line for line in file]
+                lines = file.readlines()
+
             if not lines:
-                self.status.set(STATUS_MSG["EMPTY_INPUT"])
+                self.status_var.set(STATUS_MSG["EMPTY_INPUT"])
                 return
 
-            random.shuffle(lines)
-            while lines[0] == lines[-1]:
+            shuffled = False
+            while not shuffled:
+                before_shuffle = lines.copy()
                 random.shuffle(lines)
+                shuffled = any(before != after for before, after in zip(before_shuffle, lines))
 
             with open(output_file, 'w') as file:
                 file.writelines(lines)
 
-            self.status.set(f"Done! Shuffled data saved to {output_file}")
+            self.status_var.set(STATUS_MSG["DONE"].format(output_file))
         except Exception as e:
-            self.status.set("Error encountered.")
+            self.status_var.set(STATUS_MSG["ERROR"].format(e))
             messagebox.showerror("Error", str(e))
 
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = DataMingle(root)
+    app = DataMingleApp(root)
     root.mainloop()

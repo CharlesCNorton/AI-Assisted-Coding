@@ -1,14 +1,12 @@
 import psutil
 from GPUtil import getGPUs
 from tkinter import Tk, RIGHT, BOTH, X, Button, Frame, Label
-import threading
-import time
 
 REFRESH_RATE = 2000
 
 class SysInfo(Frame):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, master=None):
+        super().__init__(master)
         self.night_mode = False
         self.themes = {
             "day": {"bg": "white", "fg": "black", "btn_text": "Night Mode"},
@@ -16,7 +14,7 @@ class SysInfo(Frame):
         }
         self.initUI()
         self.set_theme("day")
-        self.start_update_thread()
+        self.update_info()
 
     def initUI(self):
         self.master.title("System Info")
@@ -52,9 +50,9 @@ class SysInfo(Frame):
         self.night_mode_btn.pack(side=RIGHT, padx=5)
 
     def toggle_night_mode(self):
-        theme = "night" if not self.night_mode else "day"
-        self.set_theme(theme)
         self.night_mode = not self.night_mode
+        theme = "night" if self.night_mode else "day"
+        self.set_theme(theme)
 
     def set_theme(self, theme_name):
         theme = self.themes[theme_name]
@@ -69,15 +67,10 @@ class SysInfo(Frame):
         self.night_mode_btn.config(text=btn_text, bg=bg_color, fg=fg_color)
 
     def update_info(self):
-        while True:
-            self.update_cpu_info()
-            self.update_ram_info()
-            self.update_gpu_info()
-            time.sleep(REFRESH_RATE / 1000.0)
-
-    def start_update_thread(self):
-        update_thread = threading.Thread(target=self.update_info, daemon=True)
-        update_thread.start()
+        self.update_cpu_info()
+        self.update_ram_info()
+        self.update_gpu_info()
+        self.after(REFRESH_RATE, self.update_info)
 
     def update_gpu_info(self):
         try:
@@ -98,13 +91,13 @@ class SysInfo(Frame):
         self.ram_label.config(text=f"RAM: {ram_perc}%")
 
     def update_cpu_info(self):
-        cpu_util = round(psutil.cpu_percent(interval=1), 2)
+        cpu_util = round(psutil.cpu_percent(interval=None), 2)
         self.cpu_util_label.config(text=f"CPU Util: {cpu_util}%")
 
 def main():
     root = Tk()
     root.geometry("250x200+300+300")
-    app = SysInfo(root)
+    app = SysInfo(master=root)
     root.mainloop()
 
 if __name__ == '__main__':

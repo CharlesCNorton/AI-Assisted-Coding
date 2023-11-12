@@ -1,6 +1,9 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, Text, Scrollbar, Toplevel
 from collections import defaultdict
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 class SentenceAnalyzer:
     @staticmethod
@@ -42,22 +45,14 @@ class SentenceAnalyzer:
                 data[length_cat][ending_cat] += 1
                 total_sentences += 1
 
-            summary = f"Analysis of '{file_path.split('/')[-1]}':\nTotal Sentences: {total_sentences:,.0f}\n" + "-" * 40 + "\n"
-            results.delete(1.0, tk.END)
-            results.insert(tk.END, summary)
-
-            for length in ["Large", "Medium", "Short", "Other"]:
-                if length in data:
-                    results.insert(tk.END, f"{length} Sentences:\n")
-                    for ending, count in data[length].items():
-                        results.insert(tk.END, f" - {ending}: {count:,.0f}\n")
-                    results.insert(tk.END, "\n")
+            return data, total_sentences
 
         except FileNotFoundError:
             messagebox.showerror("Error", "File not found!")
+            logging.error(f"File not found: {file_path}")
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {e}")
-
+            logging.error(f"Error processing file: {e}")
 
 class LinguaLensApp:
     def __init__(self, root):
@@ -66,7 +61,7 @@ class LinguaLensApp:
 
     def setup_ui(self):
         self.root.title("LinguaLens")
-        self.root.geometry("500x500")
+        self.root.geometry("600x600")
 
         menu = tk.Menu(self.root)
         self.root.config(menu=menu)
@@ -74,25 +69,46 @@ class LinguaLensApp:
         file_menu = tk.Menu(menu)
         menu.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="Open...", command=self.browse_files)
+        file_menu.add_command(label="Save Analysis...", command=self.save_analysis)
         file_menu.add_command(label="Exit", command=self.root.quit)
 
         help_menu = tk.Menu(menu)
         menu.add_cascade(label="Help", menu=help_menu)
         help_menu.add_command(label="About", command=self.show_help)
 
-        global results
-        results = Text(self.root, wrap=tk.WORD, height=24, width=60)
-        results.pack(padx=10, pady=10)
+        self.results = Text(self.root, wrap=tk.WORD, height=30, width=70)
+        self.results.pack(padx=10, pady=10)
 
-        scroll = Scrollbar(self.root, command=results.yview)
+        scroll = Scrollbar(self.root, command=self.results.yview)
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
 
-        results.configure(yscrollcommand=scroll.set)
+        self.results.configure(yscrollcommand=scroll.set)
 
     def browse_files(self):
-        filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
+        filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
         if filename:
-            SentenceAnalyzer.analyze_file(filename)
+            data, total_sentences = SentenceAnalyzer.analyze_file(filename)
+            self.display_results(data, total_sentences, filename)
+
+    def display_results(self, data, total_sentences, filename):
+        if data is not None:
+            summary = f"Analysis of '{filename.split('/')[-1]}':\nTotal Sentences: {total_sentences:,.0f}\n" + "-" * 40 + "\n"
+            self.results.delete(1.0, tk.END)
+            self.results.insert(tk.END, summary)
+
+            for length in ["Large", "Medium", "Short", "Other"]:
+                if length in data:
+                    self.results.insert(tk.END, f"{length} Sentences:\n")
+                    for ending, count in data[length].items():
+                        self.results.insert(tk.END, f" - {ending}: {count:,.0f}\n")
+                    self.results.insert(tk.END, "\n")
+
+    def save_analysis(self):
+        file = filedialog.asksaveasfile(mode='w', defaultextension=".txt")
+        if file:
+            text_to_save = self.results.get("1.0", tk.END)
+            file.write(text_to_save)
+            file.close()
 
     def show_help(self):
         help_window = Toplevel(self.root)
@@ -111,7 +127,6 @@ class LinguaLensApp:
 This tool helps to analyze the symmetry of datasets intended for language model fine-tuning."""
         label = tk.Label(help_window, text=help_text, padx=10, pady=10, justify=tk.LEFT)
         label.pack()
-
 
 if __name__ == "__main__":
     root = tk.Tk()

@@ -1,6 +1,10 @@
+import logging
 import psutil
-from GPUtil import getGPUs
+from GPUtil import getGPUs, GPUStatCollection
 from tkinter import Tk, RIGHT, BOTH, X, Button, Frame, Label
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 REFRESH_RATE = 2000
 
@@ -81,18 +85,27 @@ class SysInfo(Frame):
                 gpu_util = round(gpu.load * 100, 2)
                 self.vram_label.config(text=f"VRAM: {vram_perc}%")
                 self.gpu_util_label.config(text=f"GPU Util: {gpu_util}%")
-        except Exception as e:
+        except GPUStatCollection as e:
+            logging.error(f"Failed to retrieve GPU information: {e}")
             self.vram_label.config(text="VRAM: N/A")
             self.gpu_util_label.config(text="GPU Util: N/A")
 
     def update_ram_info(self):
-        ram = psutil.virtual_memory()
-        ram_perc = round(ram.used / ram.total * 100, 2)
-        self.ram_label.config(text=f"RAM: {ram_perc}%")
+        try:
+            ram = psutil.virtual_memory()
+            ram_perc = round(ram.used / ram.total * 100, 2)
+            self.ram_label.config(text=f"RAM: {ram_perc}%")
+        except Exception as e:
+            logging.error(f"Failed to retrieve RAM information: {e}")
+            self.ram_label.config(text="RAM: N/A")
 
     def update_cpu_info(self):
-        cpu_util = round(psutil.cpu_percent(interval=None), 2)
-        self.cpu_util_label.config(text=f"CPU Util: {cpu_util}%")
+        try:
+            cpu_util = round(psutil.cpu_percent(interval=None), 2)
+            self.cpu_util_label.config(text=f"CPU Util: {cpu_util}%")
+        except Exception as e:
+            logging.error(f"Failed to retrieve CPU utilization: {e}")
+            self.cpu_util_label.config(text="CPU Util: N/A")
 
 def main():
     root = Tk()

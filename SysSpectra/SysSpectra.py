@@ -1,6 +1,6 @@
 import logging
 import psutil
-from GPUtil import getGPUs, GPUStatCollection
+from GPUtil import getGPUs
 from tkinter import Tk, RIGHT, BOTH, X, Button, Frame, Label
 
 # Configure logging
@@ -85,7 +85,7 @@ class SysInfo(Frame):
                 gpu_util = round(gpu.load * 100, 2)
                 self.vram_label.config(text=f"VRAM: {vram_perc}%")
                 self.gpu_util_label.config(text=f"GPU Util: {gpu_util}%")
-        except GPUStatCollection as e:
+        except Exception as e:
             logging.error(f"Failed to retrieve GPU information: {e}")
             self.vram_label.config(text="VRAM: N/A")
             self.gpu_util_label.config(text="GPU Util: N/A")

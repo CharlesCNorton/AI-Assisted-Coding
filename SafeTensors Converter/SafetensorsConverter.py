@@ -8,49 +8,57 @@ from safetensors.torch import load_file, save_file
 selected_directory = ""
 
 def check_file_size(sf_filename: str, pt_filename: str):
-    sf_size = os.stat(sf_filename).st_size
-    pt_size = os.stat(pt_filename).st_size
-    if (sf_size - pt_size) / pt_size > 0.01:
-        raise RuntimeError(
-            f"""The file size difference is more than 1%:
-         - {sf_filename}: {sf_size}
-         - {pt_filename}: {pt_size}
-         """
-        )
+    try:
+        sf_size = os.stat(sf_filename).st_size
+        pt_size = os.stat(pt_filename).st_size
+        if (sf_size - pt_size) / pt_size > 0.01:
+            raise RuntimeError(
+                f"The file size difference is more than 1%:\n - {sf_filename}: {sf_size}\n - {pt_filename}: {pt_size}"
+            )
+    except Exception as e:
+        messagebox.showerror("File Size Check Error", str(e))
+        return False
+    return True
 
 def convert_file(pt_filename: str, sf_filename: str):
-    if os.path.exists(sf_filename):
-        if not messagebox.askyesno("File Exists", f"The file {sf_filename} already exists. Do you want to overwrite it?"):
-            return
-    loaded = torch.load(pt_filename, map_location="cpu")
-    if "state_dict" in loaded:
-        loaded = loaded["state_dict"]
-    loaded = {k: v.contiguous() for k, v in loaded.items()}
-    os.makedirs(os.path.dirname(sf_filename), exist_ok=True)
-    save_file(loaded, sf_filename, metadata={"format": "pt"})
-    check_file_size(sf_filename, pt_filename)
-    reloaded = load_file(sf_filename)
-    for k in loaded:
-        pt_tensor = loaded[k]
-        sf_tensor = reloaded[k]
-        if not torch.equal(pt_tensor, sf_tensor):
-            raise RuntimeError(f"The output tensors do not match for key {k}")
+    try:
+        if os.path.exists(sf_filename):
+            if not messagebox.askyesno("File Exists", f"The file {sf_filename} already exists. Do you want to overwrite it?"):
+                return
+        loaded = torch.load(pt_filename, map_location="cpu")
+        if "state_dict" in loaded:
+            loaded = loaded["state_dict"]
+        loaded = {k: v.contiguous() for k, v in loaded.items()}
+        os.makedirs(os.path.dirname(sf_filename), exist_ok=True)
+        save_file(loaded, sf_filename, metadata={"format": "pt"})
+        if check_file_size(sf_filename, pt_filename):
+            reloaded = load_file(sf_filename)
+            for k in loaded:
+                pt_tensor = loaded[k]
+                sf_tensor = reloaded[k]
+                if not torch.equal(pt_tensor, sf_tensor):
+                    raise RuntimeError(f"The output tensors do not match for key {k}")
+    except Exception as e:
+        messagebox.showerror("Conversion Error", str(e))
 
 def convert_all_files_in_directory(directory: str):
-    for filename in os.listdir(directory):
-        pt_filename = os.path.join(directory, filename)
-        sf_filename = None
+    try:
+        for filename in os.listdir(directory):
+            pt_filename = os.path.join(directory, filename)
+            sf_filename = None
 
-        match = re.match(r"pytorch_model-(\d+)-of-(\d+).bin", filename)
-        if match:
-            part_num, total_parts = match.groups()
-            sf_filename = os.path.join(directory, f"model-{part_num.zfill(5)}-of-{total_parts.zfill(5)}.safetensors")
+            match = re.match(r"pytorch_model-(\d+)-of-(\d+).bin", filename)
+            if match:
+                part_num, total_parts = match.groups()
+                sf_filename = os.path.join(directory, f"model-{part_num.zfill(5)}-of-{total_parts.zfill(5)}.safetensors")
 
-        elif filename == "pytorch_model.bin":
-            sf_filename = os.path.join(directory, "model.safetensors")
+            elif filename == "pytorch_model.bin":
+                sf_filename = os.path.join(directory, "model.safetensors")
 
-        if sf_filename:
-            convert_file(pt_filename, sf_filename)
+            if sf_filename:
+                convert_file(pt_filename, sf_filename)
+    except Exception as e:
+        messagebox.showerror("Directory Conversion Error", str(e))
 
 def select_directory():
     global selected_directory

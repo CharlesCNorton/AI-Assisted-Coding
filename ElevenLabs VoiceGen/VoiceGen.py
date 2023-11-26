@@ -17,24 +17,32 @@ def initialize_api_key():
     if API_KEY == "YOUR_API_KEY":
         API_KEY = input("Please enter your ElevenLabs API key: ")
 
+def fetch_api_data(endpoint, headers):
+    """General function to fetch data from API."""
+    try:
+        response = requests.get(f"{BASE_URL}/{endpoint}", headers=headers)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.HTTPError as errh:
+        print ("Http Error:", errh)
+    except requests.exceptions.ConnectionError as errc:
+        print ("Error Connecting:", errc)
+    except requests.exceptions.Timeout as errt:
+        print ("Timeout Error:", errt)
+    except requests.exceptions.RequestException as err:
+        print ("Oops: Something Else", err)
+
 def get_voices():
     """Fetch available voices from the ElevenLabs API."""
     headers = {"xi-api-key": API_KEY}
-    response = requests.get(f"{BASE_URL}/voices", headers=headers)
+    return fetch_api_data("voices", headers)
 
-    if response.status_code == 200:
-        return response.json()["voices"]
-    else:
-        raise Exception(f"Error fetching voices: {response.status_code} - {response.text}")
-
-def display_voices():
-    """Display the available voices and return the list of voices."""
-    voices = get_voices()
+def display_voices(voices):
+    """Display the available voices."""
     for index, voice in enumerate(voices, 1):
         print(f"{index}. {voice['name']} ({voice['voice_id']})")
-    return voices
 
-def set_voice(voices):
+def select_voice(voices):
     """Prompt the user to select a voice and return the selected voice."""
     while True:
         try:
@@ -47,6 +55,21 @@ def set_voice(voices):
                 print("\nInvalid voice number.")
         except ValueError:
             print("\nInvalid input. Please enter a valid number.")
+
+def handle_text_to_speech_response(response, filename):
+    """Handle the response for text to speech conversion."""
+    try:
+        if response.status_code == 200:
+            full_path = os.path.join(DEFAULT_DIR, filename)
+            with open(full_path, 'wb') as audio_file:
+                audio_file.write(response.content)
+            print(f"Audio saved as {full_path}")
+        else:
+            print(f"Error: {response.json().get('message', response.text)}")
+    except PermissionError:
+        print("Permission denied. Try saving the file in a different directory or with a different filename.")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
 
 def text_to_speech(text, voice_id):
     """Convert given text to speech using a specified voice."""
@@ -64,30 +87,16 @@ def text_to_speech(text, voice_id):
             "use_speaker_boost": True
         }
     }
-    response = requests.post(
-        f"{BASE_URL}/text-to-speech/{voice_id}",
-        headers=headers,
-        json=data
-    )
-    handle_response(response)
-
-def handle_response(response):
-    """Save audio response to a file or display error message."""
     try:
-        if response.status_code == 200:
-            filename = input("Enter a filename for the audio output (without extension, e.g., myaudio): ")
-            filename = sanitize_filename(filename) + ".mp3"
-            full_path = os.path.join(DEFAULT_DIR, filename)
-            with open(full_path, 'wb') as audio_file:
-                audio_file.write(response.content)
-            print(f"Audio saved as {full_path}")
-        else:
-            error_details = response.json().get('message', response.text)
-            print(f"Error: {error_details}")
-    except PermissionError:
-        print("Permission denied. Try saving the file in a different directory or with a different filename.")
-    except Exception as e:
-        print(f"Unexpected error: {e}")
+        response = requests.post(
+            f"{BASE_URL}/text-to-speech/{voice_id}",
+            headers=headers,
+            json=data
+        )
+        response.raise_for_status()
+        handle_text_to_speech_response(response)
+    except requests.exceptions.RequestException as e:
+        print(f"Error in text-to-speech request: {e}")
 
 def main():
     """Main driver function."""
@@ -108,10 +117,13 @@ def main():
         choice = input("\nYour choice: ")
 
         if choice == "1":
-            voices = display_voices()
-            selected_voice = set_voice(voices)
-            if selected_voice:
-                print(f"\nYou've selected: {selected_voice['name']} ({selected_voice['voice_id']})")
+            voices_data = get_voices()
+            if voices_data:
+                voices = voices_data['voices']
+                display_voices(voices)
+                selected_voice = select_voice(voices)
+                if selected_voice:
+                    print(f"\nYou've selected: {selected_voice['name']} ({selected_voice['voice_id']})")
         elif choice == "2":
             text = input("\nEnter the text you want to convert to speech: ")
             if not text.strip():
@@ -123,7 +135,9 @@ def main():
             if not voice_id:
                 print("\nPlease provide a voice ID or select a voice first.")
                 continue
-            text_to_speech(text, voice_id)
+            filename = input("Enter a filename for the audio output (without extension, e.g., myaudio): ")
+            filename = sanitize_filename(filename) + ".mp3"
+            text_to_speech(text, voice_id, filename)
         elif choice == "3":
             dir_path = input("\nEnter the path for the default output directory (e.g., ./outputs/): ")
             if os.path.isdir(dir_path):

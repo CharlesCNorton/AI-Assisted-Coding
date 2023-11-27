@@ -7,7 +7,10 @@ from safetensors.torch import load_file, save_file
 
 selected_directory = ""
 
-def check_file_size(sf_filename: str, pt_filename: str):
+def is_valid_pytorch_file(filename: str) -> bool:
+    return filename.endswith('.bin')
+
+def check_file_size(sf_filename: str, pt_filename: str) -> bool:
     try:
         sf_size = os.stat(sf_filename).st_size
         pt_size = os.stat(pt_filename).st_size
@@ -20,45 +23,56 @@ def check_file_size(sf_filename: str, pt_filename: str):
         return False
     return True
 
+def load_pytorch_file(pt_filename: str):
+    return torch.load(pt_filename, map_location="cpu")
+
+def save_safetensor_file(loaded, sf_filename: str):
+    os.makedirs(os.path.dirname(sf_filename), exist_ok=True)
+    save_file(loaded, sf_filename, metadata={"format": "pt"})
+
+def validate_tensor_integrity(loaded, sf_filename: str):
+    reloaded = load_file(sf_filename)
+    for k in loaded:
+        pt_tensor = loaded[k]
+        sf_tensor = reloaded[k]
+        if not torch.equal(pt_tensor, sf_tensor):
+            raise RuntimeError(f"The output tensors do not match for key {k}")
+
 def convert_file(pt_filename: str, sf_filename: str):
     try:
         if os.path.exists(sf_filename):
             if not messagebox.askyesno("File Exists", f"The file {sf_filename} already exists. Do you want to overwrite it?"):
                 return
-        loaded = torch.load(pt_filename, map_location="cpu")
+        loaded = load_pytorch_file(pt_filename)
         if "state_dict" in loaded:
             loaded = loaded["state_dict"]
         loaded = {k: v.contiguous() for k, v in loaded.items()}
-        os.makedirs(os.path.dirname(sf_filename), exist_ok=True)
-        save_file(loaded, sf_filename, metadata={"format": "pt"})
+        save_safetensor_file(loaded, sf_filename)
         if check_file_size(sf_filename, pt_filename):
-            reloaded = load_file(sf_filename)
-            for k in loaded:
-                pt_tensor = loaded[k]
-                sf_tensor = reloaded[k]
-                if not torch.equal(pt_tensor, sf_tensor):
-                    raise RuntimeError(f"The output tensors do not match for key {k}")
+            validate_tensor_integrity(loaded, sf_filename)
     except Exception as e:
         messagebox.showerror("Conversion Error", str(e))
 
 def convert_all_files_in_directory(directory: str):
     try:
         for filename in os.listdir(directory):
+            if not is_valid_pytorch_file(filename):
+                continue
             pt_filename = os.path.join(directory, filename)
-            sf_filename = None
-
-            match = re.match(r"pytorch_model-(\d+)-of-(\d+).bin", filename)
-            if match:
-                part_num, total_parts = match.groups()
-                sf_filename = os.path.join(directory, f"model-{part_num.zfill(5)}-of-{total_parts.zfill(5)}.safetensors")
-
-            elif filename == "pytorch_model.bin":
-                sf_filename = os.path.join(directory, "model.safetensors")
-
+            sf_filename = determine_sf_filename(directory, filename)
             if sf_filename:
                 convert_file(pt_filename, sf_filename)
     except Exception as e:
         messagebox.showerror("Directory Conversion Error", str(e))
+
+def determine_sf_filename(directory: str, filename: str) -> str:
+    match = re.match(r"pytorch_model-(\d+)-of-(\d+).bin", filename)
+    if match:
+        part_num, total_parts = match.groups()
+        return os.path.join(directory, f"model-{part_num.zfill(5)}-of-{total_parts.zfill(5)}.safetensors")
+    elif filename == "pytorch_model.bin":
+        return os.path.join(directory, "model.safetensors")
+    return ""
 
 def select_directory():
     global selected_directory

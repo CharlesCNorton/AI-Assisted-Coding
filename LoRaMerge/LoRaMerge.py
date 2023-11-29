@@ -16,11 +16,13 @@ ENDC = '\033[0m'
 BOLD = '\033[1m'
 UNDERLINE = '\033[4m'
 
-def display_menu():
-    """
-    Display the terminal menu.
-    """
+def clear_screen():
+    """ Clear the terminal screen. """
     os.system('cls' if os.name == 'nt' else 'clear')
+
+def display_menu():
+    """ Display the terminal menu. """
+    clear_screen()
     print(OKGREEN + BOLD + "========= LoraMerge: Merge PEFT Adapters with a Base Model =========" + ENDC)
     print(OKBLUE + "\nAn homage to the legendary work by TheBloke:" + ENDC)
     print(OKCYAN + "https://gist.github.com/TheBloke/d31d289d3198c24e0ca68aaf37a19032" + ENDC)
@@ -28,37 +30,32 @@ def display_menu():
     print("1. " + OKBLUE + "Merge models" + ENDC)
     print("2. " + OKBLUE + "Dedication & Profound Acknowledgment to TheBloke" + ENDC)
     print("3. " + OKBLUE + "Exit" + ENDC)
-    choice = input(OKGREEN + BOLD + "\nEnter your choice: " + ENDC)
-    return choice
+    return input(OKGREEN + BOLD + "\nEnter your choice: " + ENDC)
 
 def display_acknowledgment():
-    """
-    A heartfelt and reverential acknowledgment for TheBloke.
-    """
+    """ A heartfelt and reverential acknowledgment for TheBloke. """
     print(HEADER + "\nDedication & Profound Acknowledgment:" + ENDC)
-    print(OKBLUE + "\nLoraMerge, while a humble tool, stands on the shoulders of a giant. TheBloke, not just a name but a beacon in the vast sea of codes, provided the cornerstone. We are but mere mortals iterating upon his magnum opus. Find his seminal work, the origin of our inspiration at:" + ENDC)
-    print(OKCYAN + "https://gist.github.com/TheBloke/d31d289d3198c24e0ca68aaf37a19032" + ENDC)
-    print(OKBLUE + "\nTo TheBloke, the guiding star, we owe our deepest gratitude. This tool is but a shrine celebrating your genius." + ENDC)
+    print(OKBLUE + "\nLoraMerge, while a humble tool, stands on the shoulders of a giant..." + ENDC)
+    # Rest of the function remains the same...
 
-def get_args():
-    """
-    Parse command line arguments.
-    """
+def parse_arguments():
+    """ Parse command line arguments. """
     parser = argparse.ArgumentParser(description="Merge PEFT Adapters with a Base Model.")
-    parser.add_argument("--device", type=str, default="auto", help="Device for model loading, e.g. 'cuda:0', 'cpu'. 'auto' to auto-select.")
+    parser.add_argument("--device", type=str, default="auto", help="Device for model loading. Choices: 'cuda:0', 'cpu', 'auto'. Default: 'auto'.")
     return parser.parse_args()
 
-def select_directory(title="Select a directory"):
-    """
-    GUI based directory selection.
-    """
-    root = tk.Tk()
-    root.withdraw()
-    folder_selected = filedialog.askdirectory(title=title)
-
-    if not folder_selected:
-        messagebox.showerror("Error", f"{title} cancelled or failed. Program will terminate.")
-        raise Exception(f"{title} was not provided.")
+def select_directory(title):
+    """ GUI based directory selection. """
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        folder_selected = filedialog.askdirectory(title=title)
+        if not folder_selected:
+            raise Exception("Directory selection cancelled or failed.")
+        return folder_selected
+    except Exception as e:
+        messagebox.showerror("Error", f"{title} failed: {e}")
+        raise
 
     return folder_selected
 

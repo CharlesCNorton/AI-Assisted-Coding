@@ -6,15 +6,18 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 import torch
 
-HEADER = '\033[95m'
-OKBLUE = '\033[94m'
-OKCYAN = '\033[96m'
-OKGREEN = '\033[92m'
-WARNING = '\033[93m'
-FAIL = '\033[91m'
-ENDC = '\033[0m'
-BOLD = '\033[1m'
-UNDERLINE = '\033[4m'
+# Refactoring color codes into a dictionary
+colors = {
+    'HEADER': '\033[95m',
+    'OKBLUE': '\033[94m',
+    'OKCYAN': '\033[96m',
+    'OKGREEN': '\033[92m',
+    'WARNING': '\033[93m',
+    'FAIL': '\033[91m',
+    'ENDC': '\033[0m',
+    'BOLD': '\033[1m',
+    'UNDERLINE': '\033[4m'
+}
 
 def clear_screen():
     """ Clear the terminal screen. """
@@ -23,25 +26,25 @@ def clear_screen():
 def display_menu():
     """ Display the terminal menu. """
     clear_screen()
-    print(OKGREEN + BOLD + "========= LoraMerge: Merge PEFT Adapters with a Base Model =========" + ENDC)
-    print(OKBLUE + "\nAn homage to the legendary work by TheBloke:" + ENDC)
-    print(OKCYAN + "https://gist.github.com/TheBloke/d31d289d3198c24e0ca68aaf37a19032" + ENDC)
-    print(HEADER + "\nOptions:" + ENDC)
-    print("1. " + OKBLUE + "Merge models" + ENDC)
-    print("2. " + OKBLUE + "Dedication & Profound Acknowledgment to TheBloke" + ENDC)
-    print("3. " + OKBLUE + "Exit" + ENDC)
-    return input(OKGREEN + BOLD + "\nEnter your choice: " + ENDC)
+    print(colors['OKGREEN'] + colors['BOLD'] + "========= LoraMerge: Merge PEFT Adapters with a Base Model =========" + colors['ENDC'])
+    print(colors['OKBLUE'] + "\nAn homage to the legendary work by TheBloke:" + colors['ENDC'])
+    print(colors['OKCYAN'] + "https://gist.github.com/TheBloke/d31d289d3198c24e0ca68aaf37a19032" + colors['ENDC'])
+    print(colors['HEADER'] + "\nOptions:" + colors['ENDC'])
+    print("1. " + colors['OKBLUE'] + "Merge models" + colors['ENDC'])
+    print("2. " + colors['OKBLUE'] + "Dedication & Profound Acknowledgment to TheBloke" + colors['ENDC'])
+    print("3. " + colors['OKBLUE'] + "Exit" + colors['ENDC'])
+    return input(colors['OKGREEN'] + colors['BOLD'] + "\nEnter your choice: " + colors['ENDC'])
 
 def display_acknowledgment():
     """ A heartfelt and reverential acknowledgment for TheBloke. """
-    print(HEADER + "\nDedication & Profound Acknowledgment:" + ENDC)
-    print(OKBLUE + "\nLoraMerge, while a humble tool, stands on the shoulders of a giant..." + ENDC)
+    print(colors['HEADER'] + "\nDedication & Profound Acknowledgment:" + colors['ENDC'])
+    print(colors['OKBLUE'] + "\nLoraMerge, while a humble tool, stands on the shoulders of a giant..." + colors['ENDC'])
     # Rest of the function remains the same...
 
 def parse_arguments():
-    """ Parse command line arguments. """
+    """ Parse command line arguments with enhanced details and validation. """
     parser = argparse.ArgumentParser(description="Merge PEFT Adapters with a Base Model.")
-    parser.add_argument("--device", type=str, default="auto", help="Device for model loading. Choices: 'cuda:0', 'cpu', 'auto'. Default: 'auto'.")
+    parser.add_argument("--device", type=str, default="auto", choices=['cuda:0', 'cpu', 'auto'], help="Device for model loading (cuda:0, cpu, auto). Default: auto.")
     return parser.parse_args()
 
 def select_directory(title):
@@ -56,8 +59,6 @@ def select_directory(title):
     except Exception as e:
         messagebox.showerror("Error", f"{title} failed: {e}")
         raise
-
-    return folder_selected
 
 def merge_models(args):
     """
@@ -94,22 +95,22 @@ def merge_models(args):
         return
 
 def main():
-    args = get_args()
+    args = parse_arguments()
 
     while True:
         choice = display_menu()
 
         if choice == '1':
             merge_models(args)
-            input(OKGREEN + "\nPress Enter to continue..." + ENDC)
+            input(colors['OKGREEN'] + "\nPress Enter to continue..." + colors['ENDC'])
         elif choice == '2':
             display_acknowledgment()
-            input(OKGREEN + "\nPress Enter to continue..." + ENDC)
+            input(colors['OKGREEN'] + "\nPress Enter to continue..." + colors['ENDC'])
         elif choice == '3':
-            print(OKBLUE + "Thank you for using LoraMerge! Exiting..." + ENDC)
+            print(colors['OKBLUE'] + "Thank you for using LoraMerge! Exiting..." + colors['ENDC'])
             break
         else:
-            input(WARNING + "Invalid choice. Press Enter to return to the menu..." + ENDC)
+            input(colors['WARNING'] + "Invalid choice. Press Enter to return to the menu..." + colors['ENDC'])
 
 def user_confirmation(message):
     """

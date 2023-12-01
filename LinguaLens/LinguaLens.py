@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, Text, Scrollbar, Toplevel
 from collections import defaultdict
 import logging
+import re
 
 logging.basicConfig(level=logging.INFO)
 
@@ -19,6 +20,18 @@ class SentenceAnalyzer:
             return "Other"
 
     @staticmethod
+    def categorize_character_length(sentence):
+        length = len(sentence)
+        if 1 <= length <= 50:
+            return "Short"
+        elif 51 <= length <= 100:
+            return "Medium"
+        elif 101 <= length <= 200:
+            return "Long"
+        else:
+            return "Very Long"
+
+    @staticmethod
     def categorize_ending(sentence):
         if sentence.endswith("?"):
             return "Question"
@@ -30,19 +43,25 @@ class SentenceAnalyzer:
             return "Other"
 
     @staticmethod
+    def split_into_sentences(text):
+        sentences = re.split(r'[.!?]', text)
+        return filter(lambda s: s.strip(), sentences)
+
+    @staticmethod
     def analyze_file(file_path):
         try:
             with open(file_path, 'r', encoding="utf-8") as file:
-                lines = file.readlines()
+                content = file.read()
 
             data = defaultdict(lambda: defaultdict(int))
             total_sentences = 0
 
-            for line in lines:
-                line = line.strip()
-                length_cat = SentenceAnalyzer.categorize_length(line)
-                ending_cat = SentenceAnalyzer.categorize_ending(line)
+            for sentence in SentenceAnalyzer.split_into_sentences(content):
+                length_cat = SentenceAnalyzer.categorize_length(sentence)
+                char_length_cat = SentenceAnalyzer.categorize_character_length(sentence)
+                ending_cat = SentenceAnalyzer.categorize_ending(sentence)
                 data[length_cat][ending_cat] += 1
+                data[char_length_cat][ending_cat] += 1
                 total_sentences += 1
 
             return data, total_sentences
@@ -50,9 +69,11 @@ class SentenceAnalyzer:
         except FileNotFoundError:
             messagebox.showerror("Error", "File not found!")
             logging.error(f"File not found: {file_path}")
+            return None, 0
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {e}")
             logging.error(f"Error processing file: {e}")
+            return None, 0
 
 class LinguaLensApp:
     def __init__(self, root):
@@ -85,13 +106,17 @@ class LinguaLensApp:
         self.results.configure(yscrollcommand=scroll.set)
 
     def browse_files(self):
-        filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
-        if filename:
-            data, total_sentences = SentenceAnalyzer.analyze_file(filename)
-            self.display_results(data, total_sentences, filename)
+        try:
+            filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
+            if filename:
+                data, total_sentences = SentenceAnalyzer.analyze_file(filename)
+                self.display_results(data, total_sentences, filename)
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred: {e}")
+            logging.error(f"Error in browse_files: {e}")
 
     def display_results(self, data, total_sentences, filename):
-        if data is not None:
+        if data:
             summary = f"Analysis of '{filename.split('/')[-1]}':\nTotal Sentences: {total_sentences:,.0f}\n" + "-" * 40 + "\n"
             self.results.delete(1.0, tk.END)
             self.results.insert(tk.END, summary)

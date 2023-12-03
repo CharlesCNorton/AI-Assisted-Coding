@@ -1,74 +1,79 @@
-# NeuraSum: Adaptive Document Summarizer
+# NeuraSum: Advanced Document Summarizer
 
 # Importing necessary libraries
-import re
-from typing import List
+import spacy
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import linear_kernel
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+
+# Load Spacy model
+try:
+    nlp = spacy.load("en_core_web_sm")
+except OSError:
+    print("Downloading the 'en_core_web_sm' model for Spacy (this may take a few moments)...")
+    spacy.cli.download("en_core_web_sm")
+    nlp = spacy.load("en_core_web_sm")
 
 class NeuraSum:
 
     @staticmethod
-    def _tokenize_sentences(document: str) -> List[str]:
-        """Tokenizes the document into sentences using regular expressions."""
-        sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?)\s', document)
-        return [sent.strip() for sent in sentences if sent]
+    def _tokenize_sentences(document: str):
+        """Tokenizes the document into sentences using Spacy."""
+        doc = nlp(document)
+        return [sent.text.strip() for sent in doc.sents]
 
     @staticmethod
-    def _word_tokenize(document: str) -> List[str]:
-        """Tokenizes the document into words using a simple delimiter-based approach."""
-        return re.findall(r'\b\w+\b', document)
+    def _extract_named_entities(document: str):
+        """Extracts named entities from the document using Spacy."""
+        doc = nlp(document)
+        return [ent.text for ent in doc.ents]
 
     @staticmethod
-    def _compute_sentence_scores(document: str, sentences: List[str]) -> List[float]:
-        """Computes the TF-IDF scores for each sentence in the document."""
-        vectorizer = TfidfVectorizer(stop_words='english').fit([document])
-        tfidf_matrix = vectorizer.transform(sentences)
-        doc_vector = vectorizer.transform([document])
-        cosine_similarities = linear_kernel(tfidf_matrix, doc_vector).flatten()
-        return cosine_similarities
+    def _compute_sentence_scores(sentences, document):
+        """Computes the sentence scores based on TF-IDF and named entity emphasis."""
+        vectorizer = TfidfVectorizer(stop_words='english')
+        tfidf_matrix = vectorizer.fit_transform(sentences + [document])
+        cosine_sim = cosine_similarity(tfidf_matrix[:-1], tfidf_matrix[-1])
+        sentence_scores = cosine_sim.flatten()
+        return sentence_scores
 
     @staticmethod
-    def _extract_named_entities(document: str) -> List[str]:
-        """Extracts named entities from the document using basic heuristics."""
-        words = NeuraSum._word_tokenize(document)
-        return [word for word in words if word[0].isupper()]
+    def _rank_sentences(sentences, scores, num_sentences):
+        """Ranks sentences based on their scores and returns the top sentences."""
+        ranked_sentences = [sentences[i] for i in np.argsort(scores, axis=0)[::-1]]
+        return ranked_sentences[:num_sentences]
 
     @staticmethod
-    def _prioritize_entities_in_summary(sentences: List[str], named_entities: List[str]) -> List[str]:
-        """Prioritizes sentences containing named entities for inclusion in the summary."""
-        entity_counts = [sum(sentence.count(entity) for entity in named_entities) for sentence in sentences]
-        return [sent for _, sent in sorted(zip(entity_counts, sentences), reverse=True)]
-
-    @staticmethod
-    def _remove_redundancy(sentences: List[str]) -> List[str]:
-        """Remove sentences that have overlapping information."""
-        lowercase_sentences = [sent.lower() for sent in sentences]
-        return [sentences[i] for i, sentence in enumerate(lowercase_sentences) if all(sentence not in other_sentence for j, other_sentence in enumerate(lowercase_sentences) if i != j)]
+    def _remove_redundancy(sentences):
+        """Remove redundant sentences."""
+        non_redundant_sentences = []
+        for sentence in sentences:
+            if not any(sentence in s for s in non_redundant_sentences):
+                non_redundant_sentences.append(sentence)
+        return non_redundant_sentences
 
     @classmethod
-    def summarize(cls, document: str, length: str = "medium") -> str:
-        """Generate an adaptive length summary with prioritization of named entities."""
-        length_percentage_map = {
-            "short": 0.1,
-            "medium": 0.2,
-            "long": 0.3
-        }
-
-        num_sentences = int(len(cls._tokenize_sentences(document)) * length_percentage_map.get(length, 0.2))
-        named_entities = cls._extract_named_entities(document)
-        sentences = cls._tokenize_sentences(document)
-        prioritized_sentences = cls._prioritize_entities_in_summary(sentences, named_entities)
-        sentence_scores = cls._compute_sentence_scores(document, prioritized_sentences)
-        ranked_sentences = [prioritized_sentences[i] for i in sentence_scores.argsort()[-num_sentences:][::-1]]
-        non_redundant_sentences = cls._remove_redundancy(ranked_sentences)
-
-        return " ".join(non_redundant_sentences[:num_sentences])
-
+    def summarize(cls, document: str, length: str = "medium"):
+        """Generate an adaptive length summary."""
+        try:
+            length_map = {"short": 0.1, "medium": 0.3, "long": 0.5}
+            sentences = cls._tokenize_sentences(document)
+            num_sentences = max(1, int(len(sentences) * length_map.get(length, 0.3)))
+            sentence_scores = cls._compute_sentence_scores(sentences, document)
+            ranked_sentences = cls._rank_sentences(sentences, sentence_scores, num_sentences * 2)
+            non_redundant_sentences = cls._remove_redundancy(ranked_sentences)
+            return ' '.join(non_redundant_sentences[:num_sentences])
+        except Exception as e:
+            return f"An error occurred: {e}"
 
 # Sample usage
-sample_document = """
-The Renaissance was a fervent period of European cultural, artistic, political and economic “rebirth” following the Middle Ages.
-"""
+def main():
+    print("Welcome to NeuraSum: Advanced Document Summarizer")
+    sample_document = input("Please enter a document to summarize: ")
+    length = input("Choose summary length (short, medium, long): ").lower()
+    summary = NeuraSum.summarize(sample_document, length)
+    print("\nSummary:")
+    print(summary)
 
-NeuraSum.summarize(sample_document, "short")
+if __name__ == "__main__":
+    main()

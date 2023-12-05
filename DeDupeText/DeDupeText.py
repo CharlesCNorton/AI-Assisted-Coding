@@ -6,36 +6,30 @@ import os
 import shutil
 
 def calculate_checksum(filename):
-    """Calculate the SHA-256 checksum of a file."""
     sha256_hash = hashlib.sha256()
-    with open(filename, "rb") as f:
-        for byte_block in iter(lambda: f.read(4096), b""):
+    with open(filename, "rb") as file:
+        for byte_block in iter(lambda: file.read(4096), b""):
             sha256_hash.update(byte_block)
     return sha256_hash.hexdigest()
 
-def read_file(filename):
-    """Read the contents of a file."""
+def file_operation(operation, filename, mode='r', data=None):
     try:
-        with open(filename, 'r') as f:
-            return f.readlines()
+        with open(filename, mode) as file:
+            return operation(file, data)
     except IOError as e:
-        logging.error(f"Error reading file: {e}")
-        messagebox.showerror("File Read Error", f"Error occurred while reading the file: {e}")
-        return None
+        action = 'reading' if mode == 'r' else 'writing'
+        logging.error(f"Error {action} file: {e}")
+        messagebox.showerror(f"File {action.capitalize()} Error", f"Error occurred while {action} the file: {e}")
+        return None if mode == 'r' else False
 
-def write_file(filename, lines):
-    """Write lines to a file."""
-    try:
-        with open(filename, 'w') as f:
-            f.writelines(lines)
-    except IOError as e:
-        logging.error(f"Error writing file: {e}")
-        messagebox.showerror("File Write Error", f"Error occurred while writing to the file: {e}")
-        return False
+def read_file(file, _):
+    return file.readlines()
+
+def write_file(file, lines):
+    file.writelines(lines)
     return True
 
 def backup_file(original_file):
-    """Create a backup of the file."""
     backup_file = f"{original_file}.bak"
     try:
         shutil.copy(original_file, backup_file)
@@ -47,16 +41,14 @@ def backup_file(original_file):
     return True
 
 def remove_duplicates_from_file(filename):
-    """Remove duplicate lines from a file."""
     logging.info(f"Processing the file: {filename} to identify duplicate lines.")
     messagebox.showinfo("Processing", f"Processing the file: {filename} to identify duplicate lines.")
-    
+
     if not backup_file(filename):
         return
 
     initial_checksum = calculate_checksum(filename)
-
-    lines = read_file(filename)
+    lines = file_operation(read_file, filename)
     if lines is None:
         return
 
@@ -75,7 +67,7 @@ def remove_duplicates_from_file(filename):
         messagebox.showinfo("Cancelled", "You chose not to remove duplicates. No changes made to the file.")
         return
 
-    if write_file(filename, unique_lines):
+    if file_operation(write_file, filename, 'w', unique_lines):
         messagebox.showinfo("Success", "Duplicates have been successfully removed from the file!")
 
     final_checksum = calculate_checksum(filename)
@@ -83,17 +75,15 @@ def remove_duplicates_from_file(filename):
         messagebox.showinfo("Info", "No duplicates were found or removed.")
 
 def verify_program():
-    """Verify the functionality of the program."""
     temp_filename = "temp_readme.txt"
-    with open(temp_filename, 'w') as f:
-        f.writelines(["This is a test line.\n",
-                      "This is a duplicate test line.\n",
-                      "This is a test line.\n",  # Duplicate line
-                      "This is another test line.\n"])
+    file_operation(write_file, temp_filename, 'w', ["This is a test line.\n",
+                                                    "This is a duplicate test line.\n",
+                                                    "This is a test line.\n",  # Duplicate line
+                                                    "This is another test line.\n"])
 
     remove_duplicates_from_file(temp_filename)
+    lines = file_operation(read_file, temp_filename)
 
-    lines = read_file(temp_filename)
     if lines is None:
         return
 
@@ -105,7 +95,6 @@ def verify_program():
         messagebox.showerror("Verification", "Verification Failed: There seems to be an issue with the program's functionality.")
 
 def main():
-    """Main function to run the program."""
     logging.basicConfig(level=logging.INFO)
     root = tk.Tk()
     root.withdraw()

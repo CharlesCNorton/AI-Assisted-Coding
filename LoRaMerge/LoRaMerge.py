@@ -33,7 +33,11 @@ def display_menu():
     print("1. " + colors['OKBLUE'] + "Merge models" + colors['ENDC'])
     print("2. " + colors['OKBLUE'] + "Dedication & Profound Acknowledgment to TheBloke" + colors['ENDC'])
     print("3. " + colors['OKBLUE'] + "Exit" + colors['ENDC'])
-    return input(colors['OKGREEN'] + colors['BOLD'] + "\nEnter your choice: " + colors['ENDC'])
+    try:
+        return input(colors['OKGREEN'] + colors['BOLD'] + "\nEnter your choice: " + colors['ENDC'])
+    except Exception as e:
+        print(colors['FAIL'] + "Error reading input: " + str(e) + colors['ENDC'])
+        return None
 
 def display_acknowledgment():
     """ A heartfelt and reverential acknowledgment for TheBloke. """
@@ -45,7 +49,11 @@ def parse_arguments():
     """ Parse command line arguments with enhanced details and validation. """
     parser = argparse.ArgumentParser(description="Merge PEFT Adapters with a Base Model.")
     parser.add_argument("--device", type=str, default="auto", choices=['cuda:0', 'cpu', 'auto'], help="Device for model loading (cuda:0, cpu, auto). Default: auto.")
-    return parser.parse_args()
+    try:
+        return parser.parse_args()
+    except Exception as e:
+        print(colors['FAIL'] + "Error parsing arguments: " + str(e) + colors['ENDC'])
+        exit(1)
 
 def select_directory(title):
     """ GUI based directory selection. """
@@ -91,7 +99,7 @@ def merge_models(args):
         print(f"Model saved to {output_dir}")
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(colors['FAIL'] + "An error occurred: " + str(e) + colors['ENDC'])
         return
 
 def main():
@@ -110,20 +118,23 @@ def main():
             print(colors['OKBLUE'] + "Thank you for using LoraMerge! Exiting..." + colors['ENDC'])
             break
         else:
-            input(colors['WARNING'] + "Invalid choice. Press Enter to return to the menu..." + colors['ENDC'])
+            print(colors['WARNING'] + "Invalid choice. Press Enter to return to the menu..." + colors['ENDC'])
 
 def user_confirmation(message):
     """
     Prompt the user for a confirmation with a Yes/No option.
     """
     while True:
-        choice = input(message + " (y/n): ").lower()
-        if choice in ['y', 'yes']:
-            return True
-        elif choice in ['n', 'no']:
-            return False
-        else:
-            print("Invalid input. Please respond with 'y' or 'n'.")
+        try:
+            choice = input(message + " (y/n): ").lower()
+            if choice in ['y', 'yes']:
+                return True
+            elif choice in ['n', 'no']:
+                return False
+            else:
+                print("Invalid input. Please respond with 'y' or 'n'.")
+        except Exception as e:
+            print(colors['FAIL'] + "Error reading input: " + str(e) + colors['ENDC'])
 
 if __name__ == "__main__":
     main()

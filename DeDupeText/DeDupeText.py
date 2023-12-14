@@ -5,14 +5,29 @@ import logging
 import os
 import shutil
 
+def file_exists(filename):
+    return os.path.exists(filename)
+
 def calculate_checksum(filename):
+    if not file_exists(filename):
+        logging.error(f"File not found: {filename}")
+        return None
     sha256_hash = hashlib.sha256()
-    with open(filename, "rb") as file:
-        for byte_block in iter(lambda: file.read(4096), b""):
-            sha256_hash.update(byte_block)
+    try:
+        with open(filename, "rb") as file:
+            for byte_block in iter(lambda: file.read(4096), b""):
+                sha256_hash.update(byte_block)
+    except IOError as e:
+        logging.error(f"Error reading file for checksum: {e}")
+        return None
     return sha256_hash.hexdigest()
 
 def file_operation(operation, filename, mode='r', data=None):
+    if not file_exists(filename) and mode == 'r':
+        logging.error(f"File not found: {filename}")
+        messagebox.showerror("File Error", f"File not found: {filename}")
+        return None if mode == 'r' else False
+
     try:
         with open(filename, mode) as file:
             return operation(file, data)
@@ -31,6 +46,9 @@ def write_file(file, lines):
 
 def backup_file(original_file):
     backup_file = f"{original_file}.bak"
+    if file_exists(backup_file):
+        logging.warning(f"Backup file already exists: {backup_file}")
+        messagebox.showwarning("Backup Warning", f"Backup file already exists and will be overwritten: {backup_file}")
     try:
         shutil.copy(original_file, backup_file)
         logging.info(f"Backup created: {backup_file}")
@@ -48,12 +66,21 @@ def remove_duplicates_from_file(filename):
         return
 
     initial_checksum = calculate_checksum(filename)
-    lines = file_operation(read_file, filename)
-    if lines is None:
+    if initial_checksum is None:
         return
 
-    unique_lines = sorted(set(lines), key=lines.index)
-    total_lines = len(lines)
+    # Efficient handling of large files using a set
+    unique_lines = set()
+    try:
+        with open(filename, 'r') as file:
+            for line in file:
+                unique_lines.add(line)
+    except IOError as e:
+        logging.error(f"Error reading file for duplicate removal: {e}")
+        messagebox.showerror("Read Error", f"Error occurred while reading the file: {e}")
+        return
+
+    total_lines = len(unique_lines)
     duplicates = total_lines - len(unique_lines)
 
     msg = (f"File Analysis Complete!\n\n"
@@ -67,11 +94,11 @@ def remove_duplicates_from_file(filename):
         messagebox.showinfo("Cancelled", "You chose not to remove duplicates. No changes made to the file.")
         return
 
-    if file_operation(write_file, filename, 'w', unique_lines):
+    if file_operation(write_file, filename, 'w', list(unique_lines)):
         messagebox.showinfo("Success", "Duplicates have been successfully removed from the file!")
 
     final_checksum = calculate_checksum(filename)
-    if initial_checksum == final_checksum:
+    if final_checksum is None or initial_checksum == final_checksum:
         messagebox.showinfo("Info", "No duplicates were found or removed.")
 
 def verify_program():
@@ -84,15 +111,12 @@ def verify_program():
     remove_duplicates_from_file(temp_filename)
     lines = file_operation(read_file, temp_filename)
 
-    if lines is None:
+    if lines is None or len(lines) != 3 or lines.count("This is a test line.\n") != 1:
+        messagebox.showerror("Verification", "Verification Failed: There seems to be an issue with the program's functionality.")
         return
 
     os.remove(temp_filename)
-
-    if len(lines) == 3 and lines.count("This is a test line.\n") == 1:
-        messagebox.showinfo("Verification", "Verification Complete: The program is functioning correctly!")
-    else:
-        messagebox.showerror("Verification", "Verification Failed: There seems to be an issue with the program's functionality.")
+    messagebox.showinfo("Verification", "Verification Complete: The program is functioning correctly!")
 
 def main():
     logging.basicConfig(level=logging.INFO)

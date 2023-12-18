@@ -9,6 +9,7 @@ class PaintApp:
         self.current_tool = tk.StringVar(value="brush")
         self.brush_color = tk.StringVar(value="black")
         self.brush_size = tk.IntVar(value=5)
+        self.fill_type = tk.StringVar(value="solid")  # New variable for fill type
         self.lastx = self.lasty = self.startx = self.starty = None
         self.image = Image.new("RGB", (400, 400), "white")
         self.draw = ImageDraw.Draw(self.image)
@@ -63,6 +64,14 @@ class PaintApp:
         self.load_button = tk.Button(self.root, text="Load Image", command=self.load)
         self.load_button.pack(side=tk.BOTTOM)
 
+        # Fill Type Buttons
+        self.fill_type_frame = tk.Frame(self.root)
+        self.fill_type_frame.pack(side=tk.TOP)
+        fill_types = ["solid", "gradient", "pattern"]
+        for fill_type in fill_types:
+            b = tk.Radiobutton(self.fill_type_frame, text=fill_type.capitalize(), variable=self.fill_type, value=fill_type)
+            b.pack(side=tk.LEFT)
+
     def create_message(self):
         self.message = tk.Label(self.root, text="Press and Drag the mouse to draw")
         self.message.pack(side=tk.BOTTOM)
@@ -87,13 +96,16 @@ class PaintApp:
 
     def draw_shape(self, event):
         x, y = event.x, event.y
-        if self.current_tool.get() == "line":
-            self.canvas.delete("temp_line")
-            self.draw.line((self.startx, self.starty, x, y), fill=self.brush_color.get(), width=self.brush_size.get())
-            self.canvas.create_line(self.startx, self.starty, x, y, fill=self.brush_color.get(), width=self.brush_size.get())
-        elif self.current_tool.get() == "rectangle":
-            self.draw.rectangle((self.startx, self.starty, x, y), outline=self.brush_color.get(), width=self.brush_size.get())
-            self.canvas.create_rectangle(self.startx, self.starty, x, y, outline=self.brush_color.get(), width=self.brush_size.get())
+        if self.current_tool.get() == "rectangle":
+            if self.fill_type.get() == "gradient":
+                fill_image = self.linear_gradient("red", "blue", abs(x - self.startx), abs(y - self.starty))
+                self.draw.rectangle((self.startx, self.starty, x, y), fill=fill_image)
+            elif self.fill_type.get() == "pattern":
+                pattern_image = self.create_pattern_image()  # Placeholder for pattern image
+                fill_image = self.create_pattern_fill(pattern_image, abs(x - self.startx), abs(y - self.starty))
+                self.draw.rectangle((self.startx, self.starty, x, y), fill=fill_image)
+            else:
+                self.draw.rectangle((self.startx, self.starty, x, y), outline=self.brush_color.get(), width=self.brush_size.get())
 
     def clear_canvas(self):
         self.canvas.delete("all")
@@ -143,6 +155,28 @@ class PaintApp:
         color = colorchooser.askcolor()[1]
         if color:
             self.brush_color.set(color)
+
+    def linear_gradient(self, start_color, end_color, width, height):
+        base = Image.new('RGB', (width, height), start_color)
+        top = Image.new('RGB', (width, height), end_color)
+        mask = Image.new('L', (width, height))
+        mask_data = []
+        for y in range(height):
+            mask_data.extend([int(255 * (y / height))] * width)
+        mask.putdata(mask_data)
+        base.paste(top, (0, 0), mask)
+        return base
+
+    def create_pattern_fill(self, pattern_image, width, height):
+        pattern_width, pattern_height = pattern_image.size
+        base = Image.new('RGB', (width, height), "white")
+        for i in range(0, width, pattern_width):
+            for j in range(0, height, pattern_height):
+                base.paste(pattern_image, (i, j))
+        return base
+
+    def create_pattern_image(self):
+        return Image.new('RGB', (10, 10), "black")
 
 if __name__ == "__main__":
     PaintApp()

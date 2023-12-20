@@ -2,34 +2,40 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, Text, Scrollbar, Toplevel
 from collections import defaultdict
 import logging
-import re
+import os
+import threading
+import nltk
+
+nltk.download('punkt')
+from nltk.tokenize import sent_tokenize
 
 logging.basicConfig(level=logging.INFO)
 
 class SentenceAnalyzer:
     @staticmethod
-    def categorize_length(sentence):
-        words = len(sentence.split())
-        if 1 <= words <= 5:
-            return "Short"
-        elif 6 <= words <= 15:
-            return "Medium"
-        elif 16 <= words <= 50:
-            return "Large"
-        else:
-            return "Other"
+    def categorize_sentence(sentence):
+        word_count = len(sentence.split())
+        char_count = len(sentence)
 
-    @staticmethod
-    def categorize_character_length(sentence):
-        length = len(sentence)
-        if 1 <= length <= 50:
-            return "Short"
-        elif 51 <= length <= 100:
-            return "Medium"
-        elif 101 <= length <= 200:
-            return "Long"
+        if 1 <= word_count <= 5:
+            length_cat = "Short"
+        elif 6 <= word_count <= 15:
+            length_cat = "Medium"
+        elif 16 <= word_count <= 50:
+            length_cat = "Large"
         else:
-            return "Very Long"
+            length_cat = "Other"
+
+        if 1 <= char_count <= 50:
+            char_length_cat = "Short"
+        elif 51 <= char_count <= 100:
+            char_length_cat = "Medium"
+        elif 101 <= char_count <= 200:
+            char_length_cat = "Long"
+        else:
+            char_length_cat = "Very Long"
+
+        return length_cat, char_length_cat
 
     @staticmethod
     def categorize_ending(sentence):
@@ -44,8 +50,7 @@ class SentenceAnalyzer:
 
     @staticmethod
     def split_into_sentences(text):
-        sentences = re.split(r'[.!?]', text)
-        return filter(lambda s: s.strip(), sentences)
+        return sent_tokenize(text)
 
     @staticmethod
     def analyze_file(file_path):
@@ -57,8 +62,7 @@ class SentenceAnalyzer:
             total_sentences = 0
 
             for sentence in SentenceAnalyzer.split_into_sentences(content):
-                length_cat = SentenceAnalyzer.categorize_length(sentence)
-                char_length_cat = SentenceAnalyzer.categorize_character_length(sentence)
+                length_cat, char_length_cat = SentenceAnalyzer.categorize_sentence(sentence)
                 ending_cat = SentenceAnalyzer.categorize_ending(sentence)
                 data[length_cat][ending_cat] += 1
                 data[char_length_cat][ending_cat] += 1
@@ -78,6 +82,7 @@ class SentenceAnalyzer:
 class LinguaLensApp:
     def __init__(self, root):
         self.root = root
+        self.last_directory = os.getcwd()
         self.setup_ui()
 
     def setup_ui(self):
@@ -105,15 +110,25 @@ class LinguaLensApp:
 
         self.results.configure(yscrollcommand=scroll.set)
 
+        self.status_bar = tk.Label(self.root, text="Ready", bd=1, relief=tk.SUNKEN, anchor=tk.W)
+        self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+
     def browse_files(self):
+        filename = filedialog.askopenfilename(initialdir=self.last_directory, filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
+        if filename:
+            self.last_directory = os.path.dirname(filename)
+            self.status_bar.config(text="Analyzing file...")
+            threading.Thread(target=self.analyze_file, args=(filename,), daemon=True).start()
+
+    def analyze_file(self, filename):
         try:
-            filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
-            if filename:
-                data, total_sentences = SentenceAnalyzer.analyze_file(filename)
-                self.display_results(data, total_sentences, filename)
+            data, total_sentences = SentenceAnalyzer.analyze_file(filename)
+            self.display_results(data, total_sentences, filename)
+            self.status_bar.config(text="Analysis complete.")
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {e}")
-            logging.error(f"Error in browse_files: {e}")
+            logging.error(f"Error in analyze_file: {e}")
+            self.status_bar.config(text="Ready")
 
     def display_results(self, data, total_sentences, filename):
         if data:
@@ -129,7 +144,7 @@ class LinguaLensApp:
                     self.results.insert(tk.END, "\n")
 
     def save_analysis(self):
-        file = filedialog.asksaveasfile(mode='w', defaultextension=".txt")
+        file = filedialog.asksaveasfile(mode='w', defaultextension=".txt", initialdir=self.last_directory)
         if file:
             text_to_save = self.results.get("1.0", tk.END)
             file.write(text_to_save)

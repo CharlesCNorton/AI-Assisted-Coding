@@ -1,13 +1,21 @@
+import os
+import logging
 import warnings
-from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 import gc
 import tkinter as tk
 from tkinter import filedialog
 from colorama import init, Fore, Style
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import traceback
+
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+
+logging.getLogger('tensorflow').setLevel(logging.ERROR)
+
+warnings.filterwarnings("ignore")
 
 init(autoreset=True)
-warnings.filterwarnings("ignore")
 
 class InfernoLM:
     def __init__(self, device="cpu", precision="float32", model_path=None):
@@ -22,16 +30,20 @@ class InfernoLM:
         try:
             tokenizer = AutoTokenizer.from_pretrained(self.model_path, local_files_only=True)
             model = AutoModelForCausalLM.from_pretrained(self.model_path, local_files_only=True)
+
+            model.config.pad_token_id = model.config.eos_token_id
+
             model.config.do_sample = True
             model.config.temperature = 1.0
             model.config.top_p = 0.9
             model.config.top_k = 50
             model.save_pretrained(self.model_path)
             tokenizer.add_special_tokens({'pad_token': '[PAD]'})
-            model.to(device=self.device, dtype=torch.float16 if self.precision=="float16" else torch.float32)
+            model.to(device=self.device, dtype=torch.float16 if self.precision == "float16" else torch.float32)
             return tokenizer, model
         except Exception as e:
-            raise ValueError(f"An error occurred while loading the model: {str(e)}")
+            print(f"An error occurred while loading the model: {str(e)}")
+            traceback.print_exc()
 
     def infer_text(self, prompt, mode="full", max_length=100, temperature=0.7, top_p=0.9, real_time=False):
         try:
@@ -47,6 +59,7 @@ class InfernoLM:
             }
 
             if real_time:
+                print("Starting real-time token-by-token generation...")
                 output_tokens = []
                 for i in range(max_length):
                     generation_config['max_length'] = i + 1
@@ -68,17 +81,22 @@ class InfernoLM:
 
             return inferred_text.strip()
         except Exception as e:
-            raise ValueError(f"An error occurred during text inferencing: {str(e)}")
+            print(f"An error occurred during text inferencing: {str(e)}")
+            traceback.print_exc()
+            return ""
 
     def chat_with_assistant(self, max_length=100, temperature=0.7, top_p=0.9, max_context_tokens=2048):
         constant_context = "System: This is a conversation between a user and an AI assistant. The user can ask the assistant questions, seek advice, or engage in casual conversation."
 
-        context_history = constant_context + " assistant: "
+        context_history = constant_context + " Assistant: "
         stop_characters = ".!?"
 
         while True:
             user_input = input("You: ")
-            context_history += f"user: {user_input} "
+            if user_input.lower() in ["quit", "exit"]:
+                break
+
+            context_history += f"User: {user_input} Assistant: "
 
             tokens = self.tokenizer.encode(context_history, add_special_tokens=False)
             if len(tokens) > max_context_tokens:
@@ -86,27 +104,22 @@ class InfernoLM:
             context = self.tokenizer.decode(tokens)
 
             try:
-                inferred_text = self.infer_text(f"{context}assistant: ", max_length=max_length, temperature=temperature, top_p=top_p)
+                inferred_text = self.infer_text(f"{context}", max_length=max_length, temperature=temperature, top_p=top_p)
             except Exception as e:
                 print(f"An error occurred: {e}")
+                traceback.print_exc()
                 continue
 
-            assistant_responses = inferred_text.split("assistant: ")[-1]
-            assistant_response = ""
-            for char in assistant_responses:
-                assistant_response += char
-                if char in stop_characters:
-                    break
-
-            if assistant_response.strip():
-                print(f"Assistant: {assistant_response}")
-                context_history += f"assistant: {assistant_response} "
+            assistant_responses = inferred_text.split("Assistant: ")
+            if len(assistant_responses) > 1:
+                assistant_response = assistant_responses[-1].split("User:")[0].strip()
+                if not assistant_response:
+                    assistant_response = "I'm not sure how to respond to that."
             else:
-                print("Assistant: I didn't catch that, could you please repeat?")
+                assistant_response = "Sorry, I didn't get that."
 
-            if user_input.lower() == "quit" or user_input.lower() == "exit":
-                break
-
+            print(f"Assistant: {assistant_response}")
+            context_history += f"{assistant_response} "
 
 def select_path():
     root = tk.Tk()
@@ -166,8 +179,10 @@ def main():
             if not model_path:
                 print("No directory selected. Retaining the current model.")
                 continue
-            del inferencer
+            del inferencer.model
+            del inferencer.tokenizer
             torch.cuda.empty_cache()
+            gc.collect()
             inferencer = InfernoLM(device=device_choice, precision=precision, model_path=model_path)
         elif choice == "3":
             real_time_output = not real_time_output

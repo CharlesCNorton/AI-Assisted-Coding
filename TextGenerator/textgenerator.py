@@ -30,10 +30,12 @@ class InfernoLM:
             tokenizer.pad_token = tokenizer.eos_token
             model.to(device=self.device, dtype=torch.float16 if self.precision == "float16" else torch.float32)
             return tokenizer, model
+
         elif self.inference_engine == "llama.cpp":
             print("Loading LLaMA model...")
-            model = Llama(model_path=self.model_path)
+            model = Llama(model_path=self.model_path, n_ctx=4096)
             return None, model
+
 
     def chat_with_assistant(self):
         if self.inference_engine == "transformers":
@@ -69,7 +71,7 @@ class InfernoLM:
                     self._print_assistant_message("An error occurred during generation.")
 
 
-        elif self.inference_engine == "llama.cpp":
+        if self.inference_engine == "llama.cpp":
             print("LLaMA chat mode activated. Type 'quit' or 'exit' to end the chat.")
             conversation_history = "Assistant: How can I help you?"
             self._print_assistant_message("How can I help you?")
@@ -82,17 +84,18 @@ class InfernoLM:
                     print("Exiting chat mode.")
                     break
 
-                conversation_history += f"\nUser: {user_input}\nAssistant: "
+                conversation_history += f"\nUser: {user_input}\n"
 
                 try:
                     output = self.model(
-                        conversation_history,
+                        conversation_history + "Assistant: ",
                         max_tokens=1000,
                         stop=["\n"],
                         echo=True
                     )
                     assistant_response = output['choices'][0]['text'].strip()
                     self._print_assistant_message(assistant_response)
+
                     conversation_history += assistant_response
 
                 except Exception as e:

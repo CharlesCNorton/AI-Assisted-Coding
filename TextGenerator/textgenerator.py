@@ -67,24 +67,37 @@ class InfernoLM:
                     context_history += f"<s>[INST] {assistant_response} </s><s>[INST]"
                 except Exception as e:
                     self._print_assistant_message("An error occurred during generation.")
+
+
         elif self.inference_engine == "llama.cpp":
-            print("LLaMA chat mode activated.")
+            print("LLaMA chat mode activated. Type 'quit' or 'exit' to end the chat.")
+            conversation_history = "Assistant: How can I help you?"
+            self._print_assistant_message("How can I help you?")
+
             while True:
                 self._print_user_prompt()
-                user_input = input()
+                user_input = input().strip()
+
                 if user_input.lower() in ["quit", "exit"]:
+                    print("Exiting chat mode.")
                     break
+
+                conversation_history += f"\nUser: {user_input}\nAssistant: "
+
                 try:
                     output = self.model(
-                        user_input,
+                        conversation_history,
                         max_tokens=1000,
                         stop=["\n"],
                         echo=True
                     )
                     assistant_response = output['choices'][0]['text'].strip()
                     self._print_assistant_message(assistant_response)
+                    conversation_history += assistant_response
+
                 except Exception as e:
-                    self._print_assistant_message("An error occurred during generation.")
+                    print(f"An error occurred during generation: {e}")
+                    self._print_assistant_message("I'm sorry, I couldn't generate a proper response.")
 
     def extract_response(self, generated_text, user_input):
         split_text = generated_text.split(f"[user_message: {user_input}]")

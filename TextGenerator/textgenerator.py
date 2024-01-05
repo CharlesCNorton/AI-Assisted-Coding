@@ -100,7 +100,6 @@ class InfernoLM:
 
                 except Exception as e:
                     print(f"An error occurred during generation: {e}")
-                    self._print_assistant_message("I'm sorry, I couldn't generate a proper response.")
 
     def extract_response(self, generated_text, user_input):
         split_text = generated_text.split(f"[user_message: {user_input}]")
@@ -183,7 +182,7 @@ def main():
         menu_options = [
             "1. Chat with Assistant",
             "2. Load Model",
-            "3. Choose Inference Engine"
+            f"3. Toggle Inference Engine (Currently: {inferencer.inference_engine})"
         ]
 
         if inferencer.inference_engine == "llama.cpp":
@@ -206,7 +205,13 @@ def main():
             else:
                 print("No model loaded. Please load a model first.")
         elif choice == "3":
-            inferencer.choose_inference_engine()
+            if inferencer.inference_engine == "transformers":
+                inferencer.inference_engine = "llama.cpp"
+            else:
+                inferencer.inference_engine = "transformers"
+            print(f"Inference engine switched to {inferencer.inference_engine}")
+            if inferencer.inference_engine == "transformers":
+                inferencer.choose_device()
         elif choice == "4" and inferencer.inference_engine == "llama.cpp":
             inferencer.set_gpu_layers()
         elif choice == "5":

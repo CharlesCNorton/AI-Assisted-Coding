@@ -84,12 +84,9 @@ def read_requirements_file(file_path):
                 print(f"Unable to parse line: {line}")
     return specified_versions
 
-def create_gui():
-    """Create and layout the GUI components."""
+if __name__ == "__main__":
+    root = Tk()
     Label(root, text="Python Package Manager", font=("Helvetica", 16), pady=20).pack()
     Button(root, text="Select requirements.txt and Update/Install Packages", command=handle_update_install, padx=10, pady=5).pack()
     Button(root, text="Exit", command=root.destroy, padx=10, pady=5).pack()
-
-if __name__ == "__main__":
-    create_gui()
     root.mainloop()

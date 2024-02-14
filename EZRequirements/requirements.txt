@@ -1,0 +1,6 @@
+
+tkinter
+subprocess
+os
+re
+threading

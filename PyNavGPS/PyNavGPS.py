@@ -1,19 +1,41 @@
 import serial
 import pynmea2
 import time
+import matplotlib.pyplot as plt
+from mpl_toolkits.basemap import Basemap
 
+plot_map = False
+map_initialized = False
 
-def print_menu(current_port, current_baudrate, continuous_mode):
+def print_menu(current_port, current_baudrate, continuous_mode, plot_map):
     print("\nGPS Reader Menu:")
     print("1. Start reading GPS data")
     print(f"2. Set COM port (Current: {current_port})")
     print(f"3. Set baud rate (Current: {current_baudrate})")
     mode = "Continuous" if continuous_mode else "Single"
     print(f"4. Toggle GPS data report mode (Current: {mode})")
-    print("5. Exit")
+    print(f"5. Toggle map visualization (Current: {'On' if plot_map else 'Off'})")
+    print("6. Exit")
 
+def plot_on_map(latitude, longitude):
+    global map_initialized
+    if not map_initialized:
+        plt.ion()
+        map_initialized = True
+    plt.figure(figsize=(8, 6))
+    m = Basemap(projection='cyl', llcrnrlat=latitude-5, urcrnrlat=latitude+5,
+                llcrnrlon=longitude-5, urcrnrlon=longitude+5, resolution='i')
+    m.drawmapboundary(fill_color='aqua')
+    m.fillcontinents(color='coral', lake_color='aqua')
+    m.drawcoastlines()
+    x, y = m(longitude, latitude)
+    m.plot(x, y, 'bo', markersize=12)
+    plt.title('GPS Position')
+    plt.draw()
+    plt.pause(0.01)
 
 def get_gps_position(port='COM3', baudrate=9600, continuous=False):
+    global plot_map, map_initialized
     position_data = {
         "latitude": None, "longitude": None,
         "altitude": None, "speed": None, "time": None
@@ -30,8 +52,14 @@ def get_gps_position(port='COM3', baudrate=9600, continuous=False):
                     if line.startswith(('$GNGGA', '$GPGGA')):
                         msg = pynmea2.parse(line)
                         if msg.gps_qual > 0:
-                            position_data["latitude"] = f"{msg.latitude:.8f} {msg.lat_dir}"
-                            position_data["longitude"] = f"{msg.longitude:.8f} {msg.lon_dir}"
+                            latitude = msg.latitude
+                            if msg.lat_dir == 'S':
+                                latitude = -latitude
+                            longitude = msg.longitude
+                            if msg.lon_dir == 'W':
+                                longitude = -longitude
+                            position_data["latitude"] = latitude
+                            position_data["longitude"] = longitude
                             altitude_meters = msg.altitude
                             position_data["altitude"] = f"{altitude_meters * 3.28084:.2f} ft"
                             position_data["time"] = msg.timestamp.strftime("%H:%M:%S")
@@ -43,11 +71,18 @@ def get_gps_position(port='COM3', baudrate=9600, continuous=False):
                         position_data["speed"] = "0.00 mph" if speed_mph < 1 else f"{speed_mph:.2f} mph"
 
                     if all(value is not None for value in position_data.values()):
+
+                        if position_data["longitude"] > 0:
+                            position_data["longitude"] = -position_data["longitude"]
+
                         print("Time (UTC): {}, Latitude: {}, Longitude: {}, Altitude: {}, Speed: {}".format(
                             position_data['time'], position_data['latitude'],
                             position_data['longitude'], position_data['altitude'],
                             position_data['speed']
                         ))
+                        if plot_map:
+                            plt.close()
+                            plot_on_map(position_data['latitude'], position_data['longitude'])
                         if not continuous:
                             break
                         else:
@@ -65,14 +100,13 @@ def get_gps_position(port='COM3', baudrate=9600, continuous=False):
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
 
-
 if __name__ == "__main__":
     port = 'COM3'
     baudrate = 9600
     continuous_mode = False
 
     while True:
-        print_menu(port, baudrate, continuous_mode)
+        print_menu(port, baudrate, continuous_mode, plot_map)
         choice = input("Select an option: ").strip()
         if choice == '1':
             get_gps_position(port, baudrate, continuous_mode)
@@ -88,6 +122,11 @@ if __name__ == "__main__":
             continuous_mode = not continuous_mode
             print(f"GPS data report mode set to {'Continuous' if continuous_mode else 'Single'} report.")
         elif choice == '5':
+            plot_map = not plot_map
+            if not plot_map:
+                plt.close()
+            print(f"Map visualization set to {'On' if plot_map else 'Off'}.")
+        elif choice == '6':
             print("Exiting GPS Reader.")
             break
         else:

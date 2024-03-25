@@ -6,6 +6,9 @@ from mpl_toolkits.basemap import Basemap
 
 plot_map = False
 map_initialized = False
+fig, ax = None, None  # Initialize figure and axes for plotting
+m = None  # Initialize the Basemap instance
+plot, = None,  # Initialize the plot
 
 def print_menu(current_port, current_baudrate, continuous_mode, plot_map):
     print("\nGPS Reader Menu:")
@@ -17,22 +20,33 @@ def print_menu(current_port, current_baudrate, continuous_mode, plot_map):
     print(f"5. Toggle map visualization (Current: {'On' if plot_map else 'Off'})")
     print("6. Exit")
 
-def plot_on_map(latitude, longitude):
-    global map_initialized
-    if not map_initialized:
-        plt.ion()
-        map_initialized = True
-    plt.figure(figsize=(8, 6))
+def initialize_map(latitude, longitude):
+    global fig, ax, m, plot
+    plt.ion()
+    fig, ax = plt.subplots(figsize=(8, 6))
     m = Basemap(projection='cyl', llcrnrlat=latitude-5, urcrnrlat=latitude+5,
-                llcrnrlon=longitude-5, urcrnrlon=longitude+5, resolution='i')
+                llcrnrlon=longitude-5, urcrnrlon=longitude+5, resolution='i', ax=ax)
     m.drawmapboundary(fill_color='aqua')
     m.fillcontinents(color='coral', lake_color='aqua')
     m.drawcoastlines()
     x, y = m(longitude, latitude)
-    m.plot(x, y, 'bo', markersize=12)
+    plot, = m.plot(x, y, 'bo', markersize=12)
     plt.title('GPS Position')
+
+def update_map(latitude, longitude):
+    global plot, m
+    x, y = m(longitude, latitude)
+    plot.set_data(x, y)
     plt.draw()
     plt.pause(0.01)
+
+def plot_on_map(latitude, longitude):
+    global map_initialized
+    if not map_initialized:
+        initialize_map(latitude, longitude)
+        map_initialized = True
+    else:
+        update_map(latitude, longitude)
 
 def get_gps_position(port='COM3', baudrate=9600, continuous=False):
     global plot_map, map_initialized
@@ -81,7 +95,6 @@ def get_gps_position(port='COM3', baudrate=9600, continuous=False):
                             position_data['speed']
                         ))
                         if plot_map:
-                            plt.close()
                             plot_on_map(position_data['latitude'], position_data['longitude'])
                         if not continuous:
                             break
@@ -123,11 +136,13 @@ if __name__ == "__main__":
             print(f"GPS data report mode set to {'Continuous' if continuous_mode else 'Single'} report.")
         elif choice == '5':
             plot_map = not plot_map
-            if not plot_map:
+            if not plot_map and map_initialized:
                 plt.close()
+                map_initialized = False  # Ensure map is re-initialized next time plotting is enabled
             print(f"Map visualization set to {'On' if plot_map else 'Off'}.")
         elif choice == '6':
             print("Exiting GPS Reader.")
             break
         else:
             print("Invalid choice. Please select a valid option.")
+

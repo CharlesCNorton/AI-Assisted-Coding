@@ -6,9 +6,9 @@ from mpl_toolkits.basemap import Basemap
 
 plot_map = False
 map_initialized = False
-fig, ax = None, None  # Initialize figure and axes for plotting
-m = None  # Initialize the Basemap instance
-plot, = None,  # Initialize the plot
+fig, ax = None, None
+m = None
+plot, = None,
 
 def print_menu(current_port, current_baudrate, continuous_mode, plot_map):
     print("\nGPS Reader Menu:")
@@ -138,7 +138,7 @@ if __name__ == "__main__":
             plot_map = not plot_map
             if not plot_map and map_initialized:
                 plt.close()
-                map_initialized = False  # Ensure map is re-initialized next time plotting is enabled
+                map_initialized = False
             print(f"Map visualization set to {'On' if plot_map else 'Off'}.")
         elif choice == '6':
             print("Exiting GPS Reader.")

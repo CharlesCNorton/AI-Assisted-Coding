@@ -5,7 +5,6 @@ from colorama import Fore, init
 
 init(autoreset=True)
 
-
 class MidiModifier:
     def __init__(self):
         self.input_file = ""
@@ -61,22 +60,22 @@ class MidiModifier:
         try:
             original_midi = MidiFile(self.input_file)
             new_midi = MidiFile(ticks_per_beat=original_midi.ticks_per_beat)
-            combined_track = MidiTrack()
-            new_midi.tracks.append(combined_track)
 
-            for track in original_midi.tracks:
-                for msg in track:
-                    if not msg.is_meta and msg.type not in ['track_name', 'instrument_name']:
+            if len(original_midi.tracks) == 1:
+                new_midi.tracks.append(original_midi.tracks[0])
+                new_midi.tracks.append(MidiTrack())
+            else:
+                combined_track = MidiTrack()
+                for track in original_midi.tracks:
+                    for msg in track:
                         combined_track.append(msg.copy())
-                    elif msg.is_meta and combined_track not in new_midi.tracks:
-                        combined_track.append(msg.copy())
+                new_midi.tracks.append(combined_track)
+                new_midi.tracks.append(MidiTrack())
 
-            new_midi.tracks.append(MidiTrack())
             new_midi.save(self.output_file)
             print(f"{Fore.GREEN}Successfully converted and saved as {self.output_file}")
         except Exception as e:
             print(f"{Fore.RED}An error occurred: {e}")
-
 
 if __name__ == "__main__":
     MidiModifier().run()

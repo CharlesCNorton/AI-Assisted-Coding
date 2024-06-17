@@ -10,7 +10,6 @@ import re
 init(autoreset=True)
 
 BASE_URL = 'https://blockstream.info/testnet/api'
-
 SELF_SEND_ADDRESS = None
 
 def convert_text_to_hex(text_message):
@@ -32,22 +31,17 @@ def encrypt_message(text_message, key):
         print(Fore.RED + f"Error encrypting message: {str(e)}")
         return None
 
-def create_raw_transaction(txid, vout, hex_message, change_address, input_amount, fee):
+def create_raw_transaction(txid, vout, hex_message, change_address):
     try:
-
-        op_return_cost = 0.0001
-        change_amount = input_amount - op_return_cost - fee
-        if change_amount <= 0:
-            print(Fore.RED + "Error: Not enough balance to cover OP_RETURN output and fee.")
-            return None
-
-        return f"createrawtransaction '[{{\"txid\":\"{txid}\",\"vout\":{vout}}}]' '[{{\"data\":\"{hex_message}\"}}, {{\"{change_address}\": {change_amount}}}]'"
+        return f"createrawtransaction '[{{\"txid\":\"{txid}\",\"vout\":{vout}}}]' '[{{\"data\":\"{hex_message}\"}}, {{\"{change_address}\": 0.0001}}]'"
     except Exception as e:
         print(Fore.RED + f"Error creating raw transaction: {str(e)}")
         return None
 
-def fund_raw_transaction(raw_transaction_hex):
+def fund_raw_transaction(raw_transaction_hex, fee_rate=None):
     try:
+        if fee_rate:
+            return f"fundrawtransaction {raw_transaction_hex} '{{\"feeRate\": {fee_rate}}}'"
         return f"fundrawtransaction {raw_transaction_hex}"
     except Exception as e:
         print(Fore.RED + f"Error creating fundrawtransaction command: {str(e)}")
@@ -135,10 +129,14 @@ def can_fit_in_op_return(message):
 
 def main_menu():
     print(Fore.CYAN + Style.BRIGHT + "\nBlockTalk - Bitcoin OP_RETURN Embedding Script" + Style.RESET_ALL)
-    print(Fore.YELLOW + Style.BRIGHT + "1. Set address" + Style.RESET_ALL)
-    print(Fore.YELLOW + Style.BRIGHT + "2. Embed a new message" + Style.RESET_ALL)
-    print(Fore.YELLOW + Style.BRIGHT + "3. Test if a message can fit in OP_RETURN" + Style.RESET_ALL)
-    print(Fore.YELLOW + Style.BRIGHT + "4. Exit" + Style.RESET_ALL)
+    menu_options = [
+        "1. Set address",
+        "2. Embed a new message",
+        "3. Test if a message can fit in OP_RETURN",
+        "4. Exit"
+    ]
+    for option in menu_options:
+        print(Fore.YELLOW + Style.BRIGHT + option + Style.RESET_ALL)
 
 def main():
     global SELF_SEND_ADDRESS
@@ -177,19 +175,22 @@ def main():
                     print(Fore.RED + "Error: No unspent outputs found for the address.")
                     continue
 
-                largest_utxo = max(utxos, key=lambda x: x['value'])
-                txid = largest_utxo['txid']
-                vout = largest_utxo['vout']
-                input_amount = largest_utxo['value'] / 100000000
+                print(Fore.GREEN + "Available UTXOs:")
+                for idx, utxo in enumerate(utxos):
+                    print(Fore.YELLOW + f"{idx}: txid: {utxo['txid']}, vout: {utxo['vout']}, value: {utxo['value']} satoshis")
+
+                utxo_index = get_input(Fore.CYAN + "Select the UTXO index to use: ", lambda s: s.isdigit() and int(s) >= 0 and int(s) < len(utxos))
+                selected_utxo = utxos[int(utxo_index)]
+
+                txid = selected_utxo['txid']
+                vout = selected_utxo['vout']
 
                 encrypted_message = encrypt_message(text_message, key)
                 if encrypted_message is None or len(encrypted_message) > 160:
                     print(Fore.RED + "Error: The encrypted hex-encoded message exceeds 80 bytes. Please enter a shorter message.")
                     continue
 
-                fee = float(get_input(Fore.CYAN + "Enter the fee amount in BTC: ", lambda s: s.replace('.', '', 1).isdigit() and float(s) > 0))
-
-                raw_transaction_command = create_raw_transaction(txid, vout, encrypted_message, SELF_SEND_ADDRESS, input_amount, fee)
+                raw_transaction_command = create_raw_transaction(txid, vout, encrypted_message, SELF_SEND_ADDRESS)
                 if raw_transaction_command is None:
                     continue
 
@@ -197,7 +198,8 @@ def main():
                 print(Fore.WHITE + raw_transaction_command)
 
                 funded_raw_transaction_hex = get_input(Fore.CYAN + "\nStep 2: Enter the output from the 'createrawtransaction' command: ", is_hex)
-                fund_transaction_command = fund_raw_transaction(funded_raw_transaction_hex)
+                fee_rate = get_input(Fore.CYAN + "Enter the fee rate (in BTC per kB) to use for funding the transaction: ", lambda s: s.replace('.', '', 1).isdigit() and float(s) > 0)
+                fund_transaction_command = fund_raw_transaction(funded_raw_transaction_hex, fee_rate)
                 if fund_transaction_command is None:
                     continue
 

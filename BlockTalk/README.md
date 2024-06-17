@@ -34,8 +34,6 @@ Before embedding a message, you need to set the address where unspent transactio
 2. Select option 1 to set the address:
     The main menu will appear. Enter 1 to select the option for setting the address.
 
-    Select an option: 1
-
 3. Enter the new change address:
     You will be prompted to enter the Bitcoin address that will be used for change purposes. Ensure that this is a valid Bitcoin testnet address.
 
@@ -52,8 +50,6 @@ Once the address is set, you can embed a new message into the blockchain. This i
 
 2. Select option 2 to embed a new message:
     From the main menu, enter 2 to start the process of embedding a new message.
-
-    Select an option: 2
 
 3. Enter your text message:
     You will be prompted to enter the text message you want to embed in the blockchain. This message will be converted to hexadecimal and encrypted using AES (Advanced Encryption Standard). AES is a symmetric encryption algorithm widely used for its security and efficiency. The script uses AES in CBC (Cipher Block Chaining) mode with a randomly generated initialization vector (IV) for each encryption.

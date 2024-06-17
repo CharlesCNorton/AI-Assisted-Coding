@@ -100,18 +100,10 @@ This feature allows you to check if a given message can fit within the size limi
 2. Select option 3 to test if a message can fit in OP_RETURN:
     From the main menu, enter 3 to start the process of testing your message.
 
-    Select an option: 3
-
 3. Enter your text message:
     You will be prompted to enter the text message you want to test. The script will check if the message can fit within the OP_RETURN size limit. The maximum size for an OP_RETURN output is 80 bytes.
 
     Enter the text message to test: YourMessageHere
-
-4. Exit
-
-To exit the script, select option 4 from the main menu.
-
-    Select an option: 4
 
 Why Self-Transactions?
 
@@ -129,22 +121,6 @@ Detailed Explanation
 
 - Self-Spending: Creating a transaction that spends outputs to the same address. This allows the use of UTXOs from your address to create transactions embedding messages in the blockchain.
 - Self-Change: Sending any remaining funds from a transaction back to the same address. This ensures that any unspent funds are retained and can be used for future transactions.
-
-Example Commands
-
-Here are some example commands to help you understand how to use the script:
-
-1. Set Address:
-    python blocktalk.py
-    - Select option 1 and follow the prompts to set your address
-
-2. Embed a New Message:
-    python blocktalk.py
-    - Select option 2 and follow the prompts to embed your message
-
-3. Test if a Message Can Fit in OP_RETURN:
-    python blocktalk.py
-    - Select option 3 and follow the prompts to test your message
 
 Future Work
 

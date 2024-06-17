@@ -1,5 +1,3 @@
-BlockTalk
-
 BlockTalk is a proof of concept that demonstrates how messages can be stored in the Bitcoin blockchain. This initial version implements the functionality using the Bitcoin testnet.
 
 Overview

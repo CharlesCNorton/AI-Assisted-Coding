@@ -86,23 +86,6 @@ Once the address is set, you can embed a new message into the blockchain. This i
 
         - Explanation: This command sends the signed transaction to the network, where it will be included in a block by miners.
 
-3. Test if a Message Can Fit in OP_RETURN
-
-This feature allows you to check if a given message can fit within the size limits of an OP_RETURN output.
-
-1. Run the script:
-    Open your terminal and run the script:
-
-    python blocktalk.py
-
-2. Select option 3 to test if a message can fit in OP_RETURN:
-    From the main menu, enter 3 to start the process of testing your message.
-
-3. Enter your text message:
-    You will be prompted to enter the text message you want to test. The script will check if the message can fit within the OP_RETURN size limit. The maximum size for an OP_RETURN output is 80 bytes.
-
-    Enter the text message to test: YourMessageHere
-
 Why Self-Transactions?
 
 Purpose of Self-Transactions

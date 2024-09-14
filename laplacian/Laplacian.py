@@ -1,229 +1,235 @@
+import numpy as np
 import cupy as cp
-from cupy.cuda import cusolver
 from cupyx.scipy.sparse import csr_matrix
 from cupyx.scipy.sparse.linalg import eigsh
-import numpy as np
-from scipy.spatial import Delaunay
+from scipy.spatial import Delaunay, cKDTree
 import time
 import json
+import sys
 import traceback
 
-## N(λ) ≈ C * λ^(n/2) + D * λ^((n-1)/2) ##
-
-# Step 1: Finite Element Mesh Generation
 def generate_mesh_2d(N, boundary_type='smooth'):
-    """
-    Generate a 2D triangular mesh for the finite element method, with adaptive refinement near singularities.
+    try:
+        print(f"Generating mesh with {N} points for {boundary_type} boundary.")
+        points = np.random.rand(N, 2).astype(np.float64)
 
-    Parameters:
-    N (int): Approximate number of grid points.
-    boundary_type (str): Type of boundary ('smooth', 'edge', 'cusp', 'conical').
+        if boundary_type == 'edge':
+            print("Applying edge refinement to the mesh.")
+            points[:, 0] *= 0.5
+        elif boundary_type == 'cusp':
+            print("Applying cusp refinement to the mesh.")
+            points[:, 1] = points[:, 1] ** 2
+        elif boundary_type == 'conical':
+            print("Applying conical refinement to the mesh.")
+            r = np.sqrt(points[:, 0] ** 2 + points[:, 1] ** 2)
+            theta = np.arctan2(points[:, 1], points[:, 0])
+            r = r ** 0.5
+            points[:, 0] = r * np.cos(theta)
+            points[:, 1] = r * np.sin(theta)
 
-    Returns:
-    nodes (cupy array): Node coordinates for the mesh (in double precision).
-    elements (cupy array): Connectivity matrix for mesh elements (in double precision).
-    """
-    print(f"Generating mesh with {N} points for {boundary_type} boundary.")
+        points = remove_close_points(points)
+        tri = Delaunay(points)
+        elements = tri.simplices
 
-    # Ensure mesh is in double precision
-    points = np.random.rand(N, 2).astype(np.float64)
-    print(f"Random points generated: {points[:5]}...")  # Print first 5 points as a sample
-    tri = Delaunay(points)
+        areas = compute_element_areas(points, elements)
+        min_area_threshold = 1e-8
+        valid_elements = elements[areas > min_area_threshold]
+        elements = valid_elements
 
-    # Refine the mesh depending on the singularity type
-    if boundary_type == 'edge':
-        print("Applying edge refinement to the mesh.")
-        points[:N // 4, 0] *= 0.1  # Edge refinement
-    elif boundary_type == 'cusp':
-        print("Applying cusp refinement to the mesh.")
-        points[:N // 2, 1] *= 0.1  # Refine for cusp formation
-    elif boundary_type == 'conical':
-        print("Applying conical refinement to the mesh.")
-        points[:, :] = np.tanh(points)  # Create conical shape via compression
+        print(f"Generated mesh with {len(points)} nodes and {len(elements)} elements.")
+        return cp.asarray(points, dtype=cp.float64), cp.asarray(elements, dtype=cp.int32)
+    except Exception as e:
+        print(f"Error during mesh generation: {e}")
+        traceback.print_exc()
+        sys.exit(1)
 
-    elements = tri.simplices
-    print(f"First 5 mesh elements: {elements[:5]}...")
+def remove_close_points(points, min_distance=1e-5):
+    try:
+        tree = cKDTree(points)
+        pairs = tree.query_pairs(r=min_distance)
+        points_to_remove = {i2 for i1, i2 in pairs}
+        mask = np.ones(len(points), dtype=bool)
+        mask[list(points_to_remove)] = False
+        return points[mask]
+    except Exception as e:
+        print(f"Error during removal of close points: {e}")
+        traceback.print_exc()
+        sys.exit(1)
 
-    return cp.asarray(points, dtype=cp.float64), cp.asarray(elements, dtype=cp.int64)
+def compute_element_areas(points, elements):
+    try:
+        coords = points[elements]
+        vec1 = coords[:, 1, :] - coords[:, 0, :]
+        vec2 = coords[:, 2, :] - coords[:, 0, :]
+        cross = vec1[:, 0] * vec2[:, 1] - vec1[:, 1] * vec2[:, 0]
+        areas = 0.5 * np.abs(cross)
+        return areas
+    except Exception as e:
+        print(f"Error during computation of element areas: {e}")
+        traceback.print_exc()
+        sys.exit(1)
 
-# Step 2: Finite Element Assembly for Laplacian
 def compute_local_stiffness_matrix(nodes, element):
-    """
-    Calculate the local stiffness matrix for a triangular element using shape functions and the Laplace operator.
+    try:
+        element_indices = element.get()
+        coords = nodes.get()[element_indices, :]
 
-    Parameters:
-    nodes (cupy array): Node coordinates.
-    element (cupy array): Connectivity of the element (indices of the nodes).
+        ones = np.ones(3)
+        area_matrix = np.column_stack((ones, coords))
 
-    Returns:
-    local_stiffness (np.array): Local stiffness matrix for the given element.
-    """
-    # This is a placeholder. In practice, you would compute the local stiffness matrix
-    # based on the gradients of the shape functions, element geometry, and numerical integration.
-    # For simplicity here, we'll use a dummy matrix.
-    local_stiffness = np.random.rand(3, 3).astype(np.float64)  # Replace with actual computation
-    return local_stiffness
+        area = 0.5 * np.linalg.det(area_matrix)
+        if area <= 0:
+            return np.zeros((3, 3))
+
+        b = np.zeros(3)
+        c = np.zeros(3)
+        for i in range(3):
+            j = (i + 1) % 3
+            k = (i + 2) % 3
+            b[i] = coords[j, 1] - coords[k, 1]
+            c[i] = coords[k, 0] - coords[j, 0]
+        b /= (2 * area)
+        c /= (2 * area)
+
+        stiffness = (np.outer(b, b) + np.outer(c, c)) * area * 2
+        return stiffness
+    except Exception as e:
+        print(f"Error computing local stiffness matrix: {e}")
+        traceback.print_exc()
+        sys.exit(1)
 
 def assemble_fem_laplacian(nodes, elements):
-    """
-    Assemble the stiffness matrix (Laplacian) using the finite element method.
-
-    Parameters:
-    nodes (cupy array): Mesh node coordinates.
-    elements (cupy array): Mesh element connectivity matrix.
-
-    Returns:
-    L_sparse (cupy sparse matrix): Sparse stiffness matrix in CSR format (double precision).
-    """
-    print(f"Assembling Laplacian for {len(nodes)} nodes and {len(elements)} elements.")
-
-    data, rows, cols = [], [], []  # Using lists to accumulate sparse matrix entries
-
-    for idx, element in enumerate(elements):
-        local_stiffness = compute_local_stiffness_matrix(nodes, element)
-        if idx < 5:
-            print(f"Local stiffness matrix for element {idx}: {local_stiffness}")
-
-        for i in range(3):
-            for j in range(3):
-                rows.append(int(element[i]))
-                cols.append(int(element[j]))
-                data.append(local_stiffness[i, j])
-
-    # Convert lists to 1D arrays to ensure proper format for sparse matrix creation
-    rows = cp.array(rows, dtype=cp.int32)
-    cols = cp.array(cols, dtype=cp.int32)
-    data = cp.array(data, dtype=cp.float64)
-
-    # Assemble into a sparse matrix
-    L_sparse = csr_matrix((data, (rows, cols)), shape=(len(nodes), len(nodes)))
-
-    print(f"Laplacian matrix assembled in sparse format. Shape: {L_sparse.shape}")
-
-    return L_sparse
-
-
-# Step 3: Eigenvalue Solver using sparse eigsh for GPU Acceleration
-def compute_eigenvalues(L_sparse, num_eigenvalues=50):
-    """
-    Compute the eigenvalues of the Laplacian using sparse eigsh solver on the GPU.
-
-    Parameters:
-    L_sparse (cupy sparse matrix): Assembled Laplacian matrix (CSR format).
-    num_eigenvalues (int): Number of eigenvalues to compute.
-
-    Returns:
-    eigenvalues (cupy array): Computed eigenvalues.
-    """
-    print(f"Computing {num_eigenvalues} eigenvalues using sparse solver.")
-
     try:
-        start_time = time.time()
+        print(f"Assembling Laplacian for {len(nodes)} nodes and {len(elements)} elements.")
 
-        # Use sparse eigsh for eigenvalue computation (compute smallest num_eigenvalues)
-        eigenvalues, _ = eigsh(L_sparse, k=num_eigenvalues, which='SA')  # 'SA' finds the smallest algebraic eigenvalues
+        data = []
+        rows = []
+        cols = []
 
-        elapsed_time = time.time() - start_time
-        print(f"Eigenvalue computation completed in {elapsed_time:.2f} seconds.")
-        print(f"Eigenvalues: {eigenvalues[:5]}...")  # Print first 5 eigenvalues
+        for idx, element in enumerate(elements):
+            local_stiffness = compute_local_stiffness_matrix(nodes, element)
+            if local_stiffness is None or np.all(local_stiffness == 0):
+                continue
 
+            for i_local, i_global in enumerate(element):
+                for j_local, j_global in enumerate(element):
+                    rows.append(int(i_global.get()))
+                    cols.append(int(j_global.get()))
+                    data.append(local_stiffness[i_local, j_local])
+
+        rows_cu = cp.array(rows, dtype=cp.int32)
+        cols_cu = cp.array(cols, dtype=cp.int32)
+        data_cu = cp.array(data, dtype=cp.float64)
+
+        N = len(nodes)
+        L_sparse = csr_matrix((data_cu, (rows_cu, cols_cu)), shape=(N, N))
+
+        print(f"Laplacian matrix assembled in sparse format. Shape: {L_sparse.shape}")
+        return L_sparse
+    except Exception as e:
+        print(f"Error during assembly of FEM Laplacian: {e}")
+        traceback.print_exc()
+        sys.exit(1)
+
+def apply_dirichlet_boundary_conditions(L_sparse, nodes):
+    try:
+        N = len(nodes)
+        tol = 1e-5
+        boundary_nodes = cp.where(
+            (cp.abs(nodes[:, 0]) < tol) | (cp.abs(nodes[:, 0] - 1) < tol) |
+            (cp.abs(nodes[:, 1]) < tol) | (cp.abs(nodes[:, 1] - 1) < tol)
+        )[0]
+
+        print(f"Number of boundary nodes: {len(boundary_nodes)}")
+
+        L_sparse_cpu = L_sparse.get().tolil()
+
+        for node in boundary_nodes.get():
+            L_sparse_cpu.rows[node] = [node]
+            L_sparse_cpu.data[node] = [1.0]
+            L_sparse_cpu[node, :] = 0
+            L_sparse_cpu[:, node] = 0
+            L_sparse_cpu[node, node] = 1.0
+
+        L_sparse_cpu = L_sparse_cpu.tocsr()
+        L_sparse_bc = csr_matrix(L_sparse_cpu)
+
+        return L_sparse_bc
+    except Exception as e:
+        print(f"Error applying Dirichlet boundary conditions: {e}")
+        traceback.print_exc()
+        sys.exit(1)
+
+def compute_eigenvalues(L_sparse, num_eigenvalues=100):
+    try:
+        print(f"Computing {num_eigenvalues} smallest non-zero eigenvalues using sparse solver.")
+
+        L_sparse = (L_sparse + L_sparse.T) / 2
+
+        eigenvalues, _ = eigsh(L_sparse, k=num_eigenvalues + 20, which='SA', tol=1e-6, maxiter=3000)
+
+        eigenvalues = cp.sort(eigenvalues)
+        eigenvalues = eigenvalues[eigenvalues > 1e-8]
+        eigenvalues = eigenvalues[:num_eigenvalues]
+
+        print(f"Eigenvalue computation completed.")
         return eigenvalues
-
     except Exception as e:
         print(f"Error during eigenvalue computation: {e}")
         traceback.print_exc()
-        return None
+        sys.exit(1)
 
+def main_simulation(N=5000, num_eigenvalues=100, boundary_type='smooth'):
+    try:
+        print(f"\nStarting simulation for {boundary_type} boundary with N = {N}.")
+        start_time = time.time()
+        nodes, elements = generate_mesh_2d(N, boundary_type)
+        L_sparse = assemble_fem_laplacian(nodes, elements)
 
+        L_sparse = apply_dirichlet_boundary_conditions(L_sparse, nodes)
 
-# Step 4: Main Simulation with Convergence Testing and Error Analysis
-def main_simulation(N=500, num_eigenvalues=50, boundary_type='smooth', save_partial=False):
-    """
-    Run the FEM-based simulation for the Laplacian on a 2D mesh, including error analysis,
-    and progressively update results as computations complete.
+        eigenvalues = compute_eigenvalues(L_sparse, num_eigenvalues)
+        if eigenvalues is None or len(eigenvalues) == 0:
+            print("Eigenvalue computation failed or returned no valid eigenvalues.")
+            sys.exit(1)
 
-    Parameters:
-    N (int): Number of mesh points.
-    num_eigenvalues (int): Number of eigenvalues to compute.
-    boundary_type (str): Type of singularity ('smooth', 'edge', 'cusp', 'conical').
-    save_partial (bool): Save intermediate results as they are computed.
+        elapsed_time = time.time() - start_time
+        print(f"Simulation completed in {elapsed_time:.2f} seconds.")
 
-    Returns:
-    result (dict): Eigenvalues, mesh size, and error analysis.
-    """
-    print(f"\nStarting simulation for {boundary_type} boundary with N = {N}.")
-    start_time = time.time()
+        result = {
+            "boundary_type": boundary_type,
+            "eigenvalues": eigenvalues.get().tolist(),
+            "mesh_size": N,
+            "num_eigenvalues": num_eigenvalues,
+            "elapsed_time": elapsed_time
+        }
+        return result
+    except Exception as e:
+        print(f"Error during main simulation: {e}")
+        traceback.print_exc()
+        sys.exit(1)
 
-    # Generate mesh and assemble FEM Laplacian
-    nodes, elements = generate_mesh_2d(N, boundary_type)
-    L_sparse = assemble_fem_laplacian(nodes, elements)
+def run_torture_tests():
+    try:
+        print("Starting torture tests with increased mesh sizes and number of eigenvalues...")
+        boundary_types = ['smooth', 'edge', 'cusp', 'conical']
+        grid_sizes = [5000, 10000, 20000]  # Mesh sizes increased by a factor of 10
+        num_eigenvalues = 100  # Number of eigenvalues increased to 100
+        results = []
+        for boundary in boundary_types:
+            for N in grid_sizes:
+                print(f"\nRunning simulation for {boundary} singularity with grid size {N}.")
+                result = main_simulation(N=N, num_eigenvalues=num_eigenvalues, boundary_type=boundary)
+                if result:
+                    results.append(result)
+                    print(f"Simulation for {boundary} with N={N} completed.")
+        with open('torture_test_results.json', 'w') as f:
+            json.dump(results, f, indent=4)
+        print("Torture tests completed and results saved.")
+    except Exception as e:
+        print(f"Error during torture tests: {e}")
+        traceback.print_exc()
+        sys.exit(1)
 
-    # Compute eigenvalues using sparse solver
-    eigenvalues = compute_eigenvalues(L_sparse, num_eigenvalues)
-
-    if eigenvalues is None:
-        print("Eigenvalue computation failed, exiting.")
-        return None
-
-    # Error estimate
-    error_estimate = cp.abs(eigenvalues[-1] - eigenvalues[-2])  # Check last two eigenvalues for convergence
-    print(f"Error estimate for eigenvalues: {error_estimate}")
-
-    elapsed_time = time.time() - start_time
-
-    # Collect results and metadata
-    result = {
-        "boundary_type": boundary_type,
-        "eigenvalues": eigenvalues.tolist(),
-        "mesh_size": N,
-        "num_eigenvalues": num_eigenvalues,
-        "error_estimate": error_estimate.item(),  # Convert to Python scalar
-        "time_elapsed": elapsed_time
-    }
-
-    # Print summary to the terminal
-    print(f"\nSimulation completed for {boundary_type} singularities:")
-    print(f"Time Elapsed: {elapsed_time:.2f} seconds")
-    print(f"Eigenvalues: {result['eigenvalues'][:5]}...")  # Display first 5 eigenvalues
-    print(f"Error Estimate: {error_estimate:.2e}")
-
-    # Save intermediate results
-    if save_partial:
-        with open(f'results_{boundary_type}_N{N}.json', 'w') as f:
-            json.dump(result, f, indent=4)
-        print(f"Partial results saved for {boundary_type} with N={N}.")
-
-    return result
-
-# Step 5: Running Comparative Experiments
-def run_comparative_experiments():
-    """
-    Run experiments for multiple singularity types and check if the proof is supported.
-
-    The experiments test for eigenvalue convergence, asymptotic behavior, error reduction,
-    and deviations near singularities.
-    """
-    print("Starting comparative experiments...")
-    boundary_types = ['smooth', 'edge', 'cusp', 'conical']
-    grid_sizes = [500, 1000, 2000]
-    results = []
-
-    for boundary in boundary_types:
-        for N in grid_sizes:
-            print(f"\nRunning simulation for {boundary} singularity with grid size {N}.")
-            result = main_simulation(N=N, num_eigenvalues=100, boundary_type=boundary, save_partial=True)
-            if result is not None:
-                results.append(result)
-                # Save partial results after each simulation
-                with open(f'comparative_results_partial.json', 'w') as f:
-                    json.dump(results, f, indent=4)
-                print(f"Partial results saved after {boundary} singularity, grid size {N}.")
-
-    # Save the final results
-    with open('comparative_results_with_error.json', 'w') as f:
-        json.dump(results, f, indent=4)
-    print("Comparative experiments completed and saved.")
-
-# Execution of Comparative Experiments
 if __name__ == "__main__":
-    run_comparative_experiments()
+    run_torture_tests()

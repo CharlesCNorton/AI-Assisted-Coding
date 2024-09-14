@@ -7,33 +7,51 @@ import time
 import json
 import sys
 import traceback
+import matplotlib.pyplot as plt
+import warnings
 
-def generate_mesh_2d(N, boundary_type='smooth'):
+# Suppress warnings for cleaner output
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+def generate_mesh(N, boundary_type='smooth', dimension=3):
+    """
+    Generate a 3D mesh for the finite element method, with adaptive refinement near singularities.
+    """
     try:
-        print(f"Generating mesh with {N} points for {boundary_type} boundary.")
-        points = np.random.rand(N, 2).astype(np.float64)
+        print(f"Generating {dimension}D mesh with {N} points for {boundary_type} boundary.")
+        points = np.random.rand(N, dimension).astype(np.float64)
 
+        # Refine the mesh depending on the singularity type
         if boundary_type == 'edge':
-            print("Applying edge refinement to the mesh.")
-            points[:, 0] *= 0.5
+            print("Applying edge refinement to the mesh (3D).")
+            points[:, 0] *= 0.5  # Compress along x-axis near x=0
         elif boundary_type == 'cusp':
-            print("Applying cusp refinement to the mesh.")
-            points[:, 1] = points[:, 1] ** 2
+            print("Applying cusp refinement to the mesh (3D).")
+            points[:, 2] = points[:, 2] ** 2  # Concentrate points near z=0
         elif boundary_type == 'conical':
-            print("Applying conical refinement to the mesh.")
-            r = np.sqrt(points[:, 0] ** 2 + points[:, 1] ** 2)
-            theta = np.arctan2(points[:, 1], points[:, 0])
-            r = r ** 0.5
-            points[:, 0] = r * np.cos(theta)
-            points[:, 1] = r * np.sin(theta)
+            print("Applying conical refinement to the mesh (3D).")
+            r = np.linalg.norm(points, axis=1)
+            theta = np.arccos(points[:, 2] / r)
+            phi = np.arctan2(points[:, 1], points[:, 0])
+            r = r ** 0.5  # Adjust radial distance
+            points[:, 0] = r * np.sin(theta) * np.cos(phi)
+            points[:, 1] = r * np.sin(theta) * np.sin(phi)
+            points[:, 2] = r * np.cos(theta)
 
+        # Ensure points remain within the unit cube after transformation
+        points = np.clip(points, 0.0, 1.0)
+
+        # Remove duplicate or too-close points
         points = remove_close_points(points)
-        tri = Delaunay(points)
-        elements = tri.simplices
 
-        areas = compute_element_areas(points, elements)
-        min_area_threshold = 1e-8
-        valid_elements = elements[areas > min_area_threshold]
+        # Create Delaunay triangulation in 3D
+        tri = Delaunay(points)
+        elements = tri.simplices  # Tetrahedra with 4 nodes
+
+        # Compute and filter elements with small volumes
+        volumes = compute_element_volumes(points, elements)
+        min_volume_threshold = 1e-12  # Adjusted threshold for 3D
+        valid_elements = elements[volumes > min_volume_threshold]
         elements = valid_elements
 
         print(f"Generated mesh with {len(points)} nodes and {len(elements)} elements.")
@@ -44,54 +62,83 @@ def generate_mesh_2d(N, boundary_type='smooth'):
         sys.exit(1)
 
 def remove_close_points(points, min_distance=1e-5):
+    """
+    Remove points that are too close to each other to avoid degenerate elements.
+    """
     try:
+        print("Removing close points to prevent degenerate elements...")
         tree = cKDTree(points)
         pairs = tree.query_pairs(r=min_distance)
         points_to_remove = {i2 for i1, i2 in pairs}
         mask = np.ones(len(points), dtype=bool)
         mask[list(points_to_remove)] = False
-        return points[mask]
+        filtered_points = points[mask]
+        print(f"Reduced from {len(points)} to {len(filtered_points)} points after removing close points.")
+        return filtered_points
     except Exception as e:
         print(f"Error during removal of close points: {e}")
         traceback.print_exc()
         sys.exit(1)
 
-def compute_element_areas(points, elements):
+def compute_element_volumes(points, elements):
+    """
+    Compute the volumes of tetrahedral elements.
+    """
     try:
         coords = points[elements]
-        vec1 = coords[:, 1, :] - coords[:, 0, :]
-        vec2 = coords[:, 2, :] - coords[:, 0, :]
-        cross = vec1[:, 0] * vec2[:, 1] - vec1[:, 1] * vec2[:, 0]
-        areas = 0.5 * np.abs(cross)
-        return areas
+        # Vectors along the edges
+        v0 = coords[:, 0, :]
+        v1 = coords[:, 1, :]
+        v2 = coords[:, 2, :]
+        v3 = coords[:, 3, :]
+
+        # Compute volume of tetrahedra
+        vol = np.abs(np.einsum('ij,ij->i', np.cross(v1 - v0, v2 - v0), v3 - v0)) / 6.0
+        return vol
     except Exception as e:
-        print(f"Error during computation of element areas: {e}")
+        print(f"Error during computation of element volumes: {e}")
         traceback.print_exc()
         sys.exit(1)
 
 def compute_local_stiffness_matrix(nodes, element):
+    """
+    Calculate the local stiffness matrix for a tetrahedral element using linear shape functions.
+    """
     try:
+        # Extract node coordinates
         element_indices = element.get()
-        coords = nodes.get()[element_indices, :]
+        coords = nodes.get()[element_indices, :]  # Shape: (4, 3)
 
-        ones = np.ones(3)
-        area_matrix = np.column_stack((ones, coords))
+        # Compute volume of the tetrahedron
+        v0 = coords[0]
+        v1 = coords[1]
+        v2 = coords[2]
+        v3 = coords[3]
+        mat = np.array([
+            [1, v0[0], v0[1], v0[2]],
+            [1, v1[0], v1[1], v1[2]],
+            [1, v2[0], v2[1], v2[2]],
+            [1, v3[0], v3[1], v3[2]],
+        ])
+        volume = np.abs(np.linalg.det(mat)) / 6.0
+        if volume <= 0:
+            return np.zeros((4, 4))
 
-        area = 0.5 * np.linalg.det(area_matrix)
-        if area <= 0:
-            return np.zeros((3, 3))
+        # Compute the gradients of the shape functions
+        grads = np.zeros((4, 3))
+        coeff_matrix = np.hstack((np.ones((4, 1)), coords))
+        inv_coeff_matrix = np.linalg.inv(coeff_matrix)
 
-        b = np.zeros(3)
-        c = np.zeros(3)
-        for i in range(3):
-            j = (i + 1) % 3
-            k = (i + 2) % 3
-            b[i] = coords[j, 1] - coords[k, 1]
-            c[i] = coords[k, 0] - coords[j, 0]
-        b /= (2 * area)
-        c /= (2 * area)
+        # The gradients of the shape functions are given by the last three rows of the inverse matrix
+        for i in range(4):
+            coeffs = inv_coeff_matrix[:, i]
+            grads[i, :] = coeffs[1:]  # Gradient components
 
-        stiffness = (np.outer(b, b) + np.outer(c, c)) * area * 2
+        # Compute the local stiffness matrix
+        stiffness = np.zeros((4, 4))
+        for i in range(4):
+            for j in range(4):
+                stiffness[i, j] = volume * np.dot(grads[i], grads[j])
         return stiffness
     except Exception as e:
         print(f"Error computing local stiffness matrix: {e}")
@@ -99,6 +146,9 @@ def compute_local_stiffness_matrix(nodes, element):
         sys.exit(1)
 
 def assemble_fem_laplacian(nodes, elements):
+    """
+    Assemble the global stiffness matrix (Laplacian) using the finite element method.
+    """
     try:
         print(f"Assembling Laplacian for {len(nodes)} nodes and {len(elements)} elements.")
 
@@ -131,15 +181,29 @@ def assemble_fem_laplacian(nodes, elements):
         traceback.print_exc()
         sys.exit(1)
 
-def apply_dirichlet_boundary_conditions(L_sparse, nodes):
+def identify_boundary_nodes(nodes):
+    """
+    Identify boundary nodes for a 3D unit cube domain.
+    """
     try:
-        N = len(nodes)
         tol = 1e-5
         boundary_nodes = cp.where(
             (cp.abs(nodes[:, 0]) < tol) | (cp.abs(nodes[:, 0] - 1) < tol) |
-            (cp.abs(nodes[:, 1]) < tol) | (cp.abs(nodes[:, 1] - 1) < tol)
+            (cp.abs(nodes[:, 1]) < tol) | (cp.abs(nodes[:, 1] - 1) < tol) |
+            (cp.abs(nodes[:, 2]) < tol) | (cp.abs(nodes[:, 2] - 1) < tol)
         )[0]
+        return boundary_nodes
+    except Exception as e:
+        print(f"Error identifying boundary nodes: {e}")
+        traceback.print_exc()
+        sys.exit(1)
 
+def apply_dirichlet_boundary_conditions(L_sparse, nodes):
+    """
+    Apply zero Dirichlet boundary conditions to the global stiffness matrix.
+    """
+    try:
+        boundary_nodes = identify_boundary_nodes(nodes)
         print(f"Number of boundary nodes: {len(boundary_nodes)}")
 
         L_sparse_cpu = L_sparse.get().tolil()
@@ -161,12 +225,15 @@ def apply_dirichlet_boundary_conditions(L_sparse, nodes):
         sys.exit(1)
 
 def compute_eigenvalues(L_sparse, num_eigenvalues=100):
+    """
+    Compute the eigenvalues of the Laplacian using sparse eigsh solver on the GPU.
+    """
     try:
         print(f"Computing {num_eigenvalues} smallest non-zero eigenvalues using sparse solver.")
 
         L_sparse = (L_sparse + L_sparse.T) / 2
 
-        eigenvalues, _ = eigsh(L_sparse, k=num_eigenvalues + 20, which='SA', tol=1e-6, maxiter=3000)
+        eigenvalues, _ = eigsh(L_sparse, k=num_eigenvalues + 10, which='SA', tol=1e-6, maxiter=5000)
 
         eigenvalues = cp.sort(eigenvalues)
         eigenvalues = eigenvalues[eigenvalues > 1e-8]
@@ -179,11 +246,15 @@ def compute_eigenvalues(L_sparse, num_eigenvalues=100):
         traceback.print_exc()
         sys.exit(1)
 
-def main_simulation(N=5000, num_eigenvalues=100, boundary_type='smooth'):
+def main_simulation(N=100000, num_eigenvalues=100, boundary_type='smooth'):
+    """
+    Run the FEM-based simulation for the Laplacian, including statistical output.
+    """
     try:
         print(f"\nStarting simulation for {boundary_type} boundary with N = {N}.")
+        dimension = 3
         start_time = time.time()
-        nodes, elements = generate_mesh_2d(N, boundary_type)
+        nodes, elements = generate_mesh(N, boundary_type, dimension)
         L_sparse = assemble_fem_laplacian(nodes, elements)
 
         L_sparse = apply_dirichlet_boundary_conditions(L_sparse, nodes)
@@ -196,12 +267,57 @@ def main_simulation(N=5000, num_eigenvalues=100, boundary_type='smooth'):
         elapsed_time = time.time() - start_time
         print(f"Simulation completed in {elapsed_time:.2f} seconds.")
 
+        # Compute summary statistics
+        eigenvalues_cpu = eigenvalues.get()
+        min_eigenvalue = np.min(eigenvalues_cpu)
+        max_eigenvalue = np.max(eigenvalues_cpu)
+        mean_eigenvalue = np.mean(eigenvalues_cpu)
+        median_eigenvalue = np.median(eigenvalues_cpu)
+        std_eigenvalue = np.std(eigenvalues_cpu)
+        first_ten_eigenvalues = eigenvalues_cpu[:10]
+        eigenvalue_gaps = np.diff(eigenvalues_cpu[:10])
+
+        print(f"\nSummary Statistics:")
+        print(f"Number of eigenvalues computed: {len(eigenvalues_cpu)}")
+        print(f"Minimum eigenvalue: {min_eigenvalue}")
+        print(f"Maximum eigenvalue: {max_eigenvalue}")
+        print(f"Mean eigenvalue: {mean_eigenvalue}")
+        print(f"Median eigenvalue: {median_eigenvalue}")
+        print(f"Standard deviation: {std_eigenvalue}")
+        print(f"First 10 eigenvalues: {first_ten_eigenvalues}")
+        print(f"Eigenvalue gaps (first 10): {eigenvalue_gaps}")
+
+        # Save eigenvalues to file
+        filename = f"eigenvalues_{boundary_type}_n{N}_d{dimension}.npy"
+        np.save(filename, eigenvalues_cpu)
+        print(f"Eigenvalues saved to {filename}")
+
+        # Optional: Plot eigenvalue distribution
+        plt.figure(figsize=(10, 6))
+        plt.plot(eigenvalues_cpu, np.arange(1, len(eigenvalues_cpu)+1), drawstyle='steps-post')
+        plt.xlabel('Eigenvalue λ')
+        plt.ylabel('Eigenvalue Count N(λ)')
+        plt.title(f'Eigenvalue Distribution for {boundary_type.capitalize()} Boundary (N={N}, Dimension={dimension})')
+        plt.grid(True)
+        plot_filename = f'eigenvalues_distribution_{boundary_type}.png'
+        plt.savefig(plot_filename)
+        print(f"Eigenvalue distribution plot saved as {plot_filename}")
+
         result = {
             "boundary_type": boundary_type,
-            "eigenvalues": eigenvalues.get().tolist(),
+            "dimension": dimension,
             "mesh_size": N,
             "num_eigenvalues": num_eigenvalues,
-            "elapsed_time": elapsed_time
+            "elapsed_time": elapsed_time,
+            "summary_statistics": {
+                "min_eigenvalue": min_eigenvalue,
+                "max_eigenvalue": max_eigenvalue,
+                "mean_eigenvalue": mean_eigenvalue,
+                "median_eigenvalue": median_eigenvalue,
+                "std_eigenvalue": std_eigenvalue,
+                "first_ten_eigenvalues": first_ten_eigenvalues.tolist(),
+                "eigenvalue_gaps": eigenvalue_gaps.tolist()
+            }
         }
         return result
     except Exception as e:
@@ -209,27 +325,30 @@ def main_simulation(N=5000, num_eigenvalues=100, boundary_type='smooth'):
         traceback.print_exc()
         sys.exit(1)
 
-def run_torture_tests():
+def run_simulations():
+    """
+    Run simulations for multiple boundary types and mesh sizes.
+    """
     try:
-        print("Starting torture tests with increased mesh sizes and number of eigenvalues...")
         boundary_types = ['smooth', 'edge', 'cusp', 'conical']
-        grid_sizes = [5000, 10000, 20000]  # Mesh sizes increased by a factor of 10
-        num_eigenvalues = 100  # Number of eigenvalues increased to 100
+        N = 100000  # Mesh size
+        num_eigenvalues = 100  # Adjust as needed based on computational resources
         results = []
+
         for boundary in boundary_types:
-            for N in grid_sizes:
-                print(f"\nRunning simulation for {boundary} singularity with grid size {N}.")
-                result = main_simulation(N=N, num_eigenvalues=num_eigenvalues, boundary_type=boundary)
-                if result:
-                    results.append(result)
-                    print(f"Simulation for {boundary} with N={N} completed.")
-        with open('torture_test_results.json', 'w') as f:
+            result = main_simulation(N=N, num_eigenvalues=num_eigenvalues, boundary_type=boundary)
+            results.append(result)
+            print(f"\nSimulation completed for {boundary} boundary. Results:")
+            print(json.dumps(result["summary_statistics"], indent=4))
+
+        # Save all results to a JSON file
+        with open('simulation_results.json', 'w') as f:
             json.dump(results, f, indent=4)
-        print("Torture tests completed and results saved.")
+        print("\nAll simulations completed and results saved to 'simulation_results.json'.")
     except Exception as e:
-        print(f"Error during torture tests: {e}")
+        print(f"Error during simulations: {e}")
         traceback.print_exc()
         sys.exit(1)
 
 if __name__ == "__main__":
-    run_torture_tests()
+    run_simulations()

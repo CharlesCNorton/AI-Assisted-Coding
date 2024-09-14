@@ -8,7 +8,7 @@ import time
 import json
 import traceback
 
-# N(λ) ≈ C * λ^(n/2) + D * λ^((n-1)/2)
+## N(λ) ≈ C * λ^(n/2) + D * λ^((n-1)/2) ##
 
 # Step 1: Finite Element Mesh Generation
 def generate_mesh_2d(N, boundary_type='smooth'):

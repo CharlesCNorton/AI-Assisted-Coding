@@ -1,5 +1,7 @@
 import cupy as cp
 from cupy.cuda import cusolver
+from cupyx.scipy.sparse import csr_matrix
+from cupyx.scipy.sparse.linalg import eigsh
 import numpy as np
 from scipy.spatial import Delaunay
 import time
@@ -40,9 +42,26 @@ def generate_mesh_2d(N, boundary_type='smooth'):
     elements = tri.simplices
     print(f"First 5 mesh elements: {elements[:5]}...")
 
-    return cp.asarray(points, dtype=cp.float64), cp.asarray(elements, dtype=cp.float64)
+    return cp.asarray(points, dtype=cp.float64), cp.asarray(elements, dtype=cp.int64)
 
 # Step 2: Finite Element Assembly for Laplacian
+def compute_local_stiffness_matrix(nodes, element):
+    """
+    Calculate the local stiffness matrix for a triangular element using shape functions and the Laplace operator.
+
+    Parameters:
+    nodes (cupy array): Node coordinates.
+    element (cupy array): Connectivity of the element (indices of the nodes).
+
+    Returns:
+    local_stiffness (np.array): Local stiffness matrix for the given element.
+    """
+    # This is a placeholder. In practice, you would compute the local stiffness matrix
+    # based on the gradients of the shape functions, element geometry, and numerical integration.
+    # For simplicity here, we'll use a dummy matrix.
+    local_stiffness = np.random.rand(3, 3).astype(np.float64)  # Replace with actual computation
+    return local_stiffness
+
 def assemble_fem_laplacian(nodes, elements):
     """
     Assemble the stiffness matrix (Laplacian) using the finite element method.
@@ -52,60 +71,67 @@ def assemble_fem_laplacian(nodes, elements):
     elements (cupy array): Mesh element connectivity matrix.
 
     Returns:
-    L (cupy array): Stiffness matrix in dense format (double precision).
+    L_sparse (cupy sparse matrix): Sparse stiffness matrix in CSR format (double precision).
     """
     print(f"Assembling Laplacian for {len(nodes)} nodes and {len(elements)} elements.")
 
-    num_nodes = len(nodes)
-    L = cp.zeros((num_nodes, num_nodes), dtype=cp.float64)  # Storing as dense matrix for cuSolver compatibility
-
-    # Ensure the elements array is of integer type
-    elements = elements.astype(cp.int64)  # Convert elements to int64 to avoid index errors
+    data, rows, cols = [], [], []  # Using lists to accumulate sparse matrix entries
 
     for idx, element in enumerate(elements):
-        local_stiffness = np.random.rand(3, 3).astype(np.float64)  # Double precision
+        local_stiffness = compute_local_stiffness_matrix(nodes, element)
         if idx < 5:
             print(f"Local stiffness matrix for element {idx}: {local_stiffness}")
 
         for i in range(3):
             for j in range(3):
-                L[element[i], element[j]] += local_stiffness[i, j]
+                rows.append(int(element[i]))
+                cols.append(int(element[j]))
+                data.append(local_stiffness[i, j])
 
-    print(f"Laplacian matrix assembled. Shape: {L.shape}")
+    # Convert lists to 1D arrays to ensure proper format for sparse matrix creation
+    rows = cp.array(rows, dtype=cp.int32)
+    cols = cp.array(cols, dtype=cp.int32)
+    data = cp.array(data, dtype=cp.float64)
 
-    return L
+    # Assemble into a sparse matrix
+    L_sparse = csr_matrix((data, (rows, cols)), shape=(len(nodes), len(nodes)))
+
+    print(f"Laplacian matrix assembled in sparse format. Shape: {L_sparse.shape}")
+
+    return L_sparse
 
 
-# Step 3: Eigenvalue Solver using cuSolver for GPU Acceleration (via CuPy's linalg.eigh)
-def compute_eigenvalues(L, num_eigenvalues=50):
+# Step 3: Eigenvalue Solver using sparse eigsh for GPU Acceleration
+def compute_eigenvalues(L_sparse, num_eigenvalues=50):
     """
-    Compute the eigenvalues of the Laplacian using cuSolver via CuPy's linalg.eigh on the GPU.
+    Compute the eigenvalues of the Laplacian using sparse eigsh solver on the GPU.
 
     Parameters:
-    L (cupy array): Assembled Laplacian matrix (in dense format).
+    L_sparse (cupy sparse matrix): Assembled Laplacian matrix (CSR format).
     num_eigenvalues (int): Number of eigenvalues to compute.
 
     Returns:
     eigenvalues (cupy array): Computed eigenvalues.
     """
-    print(f"Computing {num_eigenvalues} eigenvalues using cuSolver via CuPy.")
+    print(f"Computing {num_eigenvalues} eigenvalues using sparse solver.")
 
     try:
         start_time = time.time()
 
-        # Use CuPy's linalg.eigh for eigenvalue computation
-        eigenvalues, eigenvectors = cp.linalg.eigh(L)
+        # Use sparse eigsh for eigenvalue computation (compute smallest num_eigenvalues)
+        eigenvalues, _ = eigsh(L_sparse, k=num_eigenvalues, which='SA')  # 'SA' finds the smallest algebraic eigenvalues
 
         elapsed_time = time.time() - start_time
         print(f"Eigenvalue computation completed in {elapsed_time:.2f} seconds.")
         print(f"Eigenvalues: {eigenvalues[:5]}...")  # Print first 5 eigenvalues
 
-        return eigenvalues[:num_eigenvalues]  # Return only the first `num_eigenvalues`
+        return eigenvalues
 
     except Exception as e:
         print(f"Error during eigenvalue computation: {e}")
         traceback.print_exc()
         return None
+
 
 
 # Step 4: Main Simulation with Convergence Testing and Error Analysis
@@ -128,10 +154,10 @@ def main_simulation(N=500, num_eigenvalues=50, boundary_type='smooth', save_part
 
     # Generate mesh and assemble FEM Laplacian
     nodes, elements = generate_mesh_2d(N, boundary_type)
-    L = assemble_fem_laplacian(nodes, elements)
+    L_sparse = assemble_fem_laplacian(nodes, elements)
 
-    # Compute eigenvalues using cuSolver
-    eigenvalues = compute_eigenvalues(L, num_eigenvalues)
+    # Compute eigenvalues using sparse solver
+    eigenvalues = compute_eigenvalues(L_sparse, num_eigenvalues)
 
     if eigenvalues is None:
         print("Eigenvalue computation failed, exiting.")
